@@ -7,11 +7,19 @@
     outputs = {self, flake-utils, nixpkgs}: 
         flake-utils.lib.eachDefaultSystem (system:
         let
-            pkgs = import nixpkgs { inherit system; };
+            pkgs = import nixpkgs {
+                inherit system;
+                config = {
+                    android_sdk.accept_license = true;
+                    allowUnfree = true;
+                };
+            };
+            androidSdk = pkgs.androidenv.androidPkgs_9_0.androidsdk;
         in {
             devShell = pkgs.mkShell {
                 packages = with pkgs; [
                     flutter
+                    android_sdk
 
                     # rust
                     cargo
