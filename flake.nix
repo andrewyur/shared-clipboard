@@ -19,7 +19,7 @@
             devShell = pkgs.mkShell {
                 packages = with pkgs; [
                     flutter
-                    android_sdk
+                    androidSdk
 
                     # rust
                     cargo
