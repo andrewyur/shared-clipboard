@@ -11,10 +11,19 @@
         in {
             devShell = pkgs.mkShell {
                 packages = with pkgs; [
-                    python313
-                    uv
+                    flutter
+
+                    # rust
+                    cargo
+                    clippy
+                    rustc
+                    rustfmt
+                    rustup
+                    lld_19
                 ];
-                shellHook = "zsh";
+                shellHook =''
+                export RUST_SRC_PATH=${pkgs.rust.packages.stable.rustPlatform.rustLibSrc}
+                zsh'';
             };
         }
     );
