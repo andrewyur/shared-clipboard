@@ -10,16 +10,16 @@
             pkgs = import nixpkgs {
                 inherit system;
                 config = {
-                    android_sdk.accept_license = true;
+                    # android_sdk.accept_license = true;
                     allowUnfree = true;
                 };
             };
-            androidSdk = pkgs.androidenv.androidPkgs_9_0.androidsdk;
+            # androidSdk = pkgs.androidenv.androidPkgs_9_0.androidsdk;
         in {
             devShell = pkgs.mkShell {
                 packages = with pkgs; [
                     flutter
-                    androidSdk
+                    # androidSdk
 
                     # rust
                     cargo
