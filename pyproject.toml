@@ -1,0 +1,9 @@
+[project]
+name = "shared-clipboard"
+version = "0.1.0"
+description = "Truly cross-platform clipboard sharing"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "zeroconf>=0.147.0",
+]
