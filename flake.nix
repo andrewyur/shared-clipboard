@@ -18,7 +18,7 @@
         in {
             devShell = pkgs.mkShell {
                 packages = with pkgs; [
-                    flutter
+                    # flutter
                     # androidSdk
 
                     # rust
