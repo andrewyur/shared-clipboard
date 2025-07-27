@@ -13,6 +13,7 @@
                 packages = with pkgs; [
                     python313
                     uv
+                    nodejs_24
                 ];
                 shellHook = "zsh";
             };
