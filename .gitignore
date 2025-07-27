@@ -1,0 +1,4 @@
+.stignore
+.stfolder
+**/__pycache__
+**/.DS_Store
