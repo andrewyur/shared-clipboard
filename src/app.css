@@ -1,0 +1,20 @@
+:root {
+    --background: #e6e6e6d6;
+    --foreground: #fff;
+    font-family: system-ui;
+    accent-color: auto
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+  background-color: transparent !important;
+}
+
+body {
+  display: flex;
+  flex-direction: column;
+}

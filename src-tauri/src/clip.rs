@@ -65,6 +65,7 @@ impl Clip {
         log::info!("Clibboard handler checking clibpoard");
         if match clipboard_files::read() {
             Ok(file_paths) => {
+                log::debug!("clipboard files returned: {file_paths:?}");
                 self.add(ClipItem::FilePath(file_paths));
                 true
             }
@@ -113,7 +114,6 @@ impl Clip {
     }
     
     fn add(&mut self, clip_item: ClipItem) {
-        log::info!("clipboard manager adding item: {:?}", clip_item);
         if self.history.len() == HISTORY_LEN {
             self.history.pop_back();
         }
