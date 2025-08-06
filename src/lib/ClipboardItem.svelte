@@ -1,22 +1,30 @@
 <script lang="ts" module>
   export type ClipboardData = {
-    type: "image" | "text"
+    kind: "image" | "text"
     content: string
-  } | {
-    type: "filepath"
+    id: number
+} | {
+    kind: "paths"
     content: [string]
+    id: number
   };
 </script>
 
 <script lang="ts">
+    import { invoke } from "@tauri-apps/api/core";
+
     const { clipboardData }: { clipboardData: ClipboardData } = $props()
+
+    const copyItem = () => invoke("copy_item", {id: clipboardData.id});
 </script>
 
-<button>
-    {#if clipboardData.type === "text" || clipboardData.type === "filepath"}
+<button onclick={copyItem}>
+    {#if clipboardData.kind === "text"}
         <p>{ clipboardData.content }</p>
+    {:else if clipboardData.kind === "paths"}
+        <p style="font-style:italic; color:gray">{ clipboardData.content.join("\n") }</p>
     {:else}
-        <img src={"data:image/png;base64," + clipboardData.content} alt="clipboard item"/>
+        <img src={clipboardData.content} alt="clipboard item"/>
     {/if}
 </button>
 
@@ -29,6 +37,7 @@
         margin-bottom: 10px;
         border: 0;
         border-radius: 7px;
+        position: relative;
     }
     
     p {

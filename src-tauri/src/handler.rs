@@ -20,15 +20,17 @@ impl ClipboardHandler for Handler {
     fn on_clipboard_change(&mut self) -> CallbackResult {
         let state = self.handle.state::<Mutex<Clip>>();
         match state.lock() {
-            Ok(mut clip) => { 
-                clip.check(&self.handle); 
+            Ok(mut clip) => {
+                clip.check(&self.handle);
                 if let Err(e) = self.handle.emit("clipboard-changed", clip.values()) {
                     log::error!("Couldn't emit clipboard-changed event to frontend {}", e);
                 } else {
                     log::info!("successfully emitted clipboard-changed event")
                 }
-            },
-            Err(e) => { log::error!("Couldn't access clipboard manager: {}", e); }
+            }
+            Err(e) => {
+                log::error!("Couldn't access clipboard manager: {}", e);
+            }
         };
         CallbackResult::Next
     }

@@ -4,9 +4,14 @@
     import { goto } from "$app/navigation";
     import { getCurrentWindow } from "@tauri-apps/api/window";
     import { page } from "$app/state";
-
+    import { platform } from "@tauri-apps/plugin-os"
+    
     function hideWindow() {
         getCurrentWindow().hide();
+    }
+
+    if (platform() === 'macos') {
+        document.body.classList.add("macos")
     }
 </script>
 
@@ -30,9 +35,17 @@
         font-size: 1.5em;
     }
 
+    #closeButton:hover {
+        background-color: #9292927e;
+        height: 100%;
+        width: 30px;
+        border: 0;
+        margin: 0;
+    }
+
     #titleBar {
         width: 100%;
-        height: 30px;
+        height: 28px;
         display: flex;
         flex-direction: row;
         align-items: center;
@@ -69,5 +82,6 @@
         display: flex;
         flex-direction: column;
         overflow-y: scroll;
+        scrollbar-width: thin;
     }
 </style>

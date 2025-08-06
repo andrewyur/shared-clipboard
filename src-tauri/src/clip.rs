@@ -1,48 +1,15 @@
+use crate::clip_item::{ClipItem, HasId};
 use std::collections::VecDeque;
-use std::{io::Cursor, path::PathBuf};
+use std::io::Cursor;
 
 use base64::prelude::*;
 use image::imageops::thumbnail;
 use image::{ImageBuffer, ImageFormat, Rgba};
-use serde::ser::SerializeStruct;
 use tauri::{image::Image, AppHandle};
 use tauri_plugin_clipboard_manager::ClipboardExt;
 
 const HISTORY_LEN: usize = 20;
 const THUMBNAIL_HEIGHT: u32 = 300;
-
-#[derive(Debug)]
-pub enum ClipItem {
-    FilePath(Vec<PathBuf>),
-    Image((String, Image<'static>)),
-    Text(String),
-}
-
-impl serde::Serialize for ClipItem {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: serde::Serializer,
-    {
-        let mut s = serializer.serialize_struct("ClipItem", 2)?;
-        let item_type = match self {
-            ClipItem::Image((thumbnail, _)) => {
-                s.serialize_field("content", thumbnail)?;
-                "image"
-            }
-            ClipItem::FilePath(paths) => {
-                s.serialize_field("content", paths)?;
-                "filepath"
-            }
-            ClipItem::Text(text) => {
-                s.serialize_field("content", text)?;
-                "text"
-            }
-        };
-        s.serialize_field("type", item_type)?;
-        s.end()
-    }
-}
-
 pub struct Clip {
     history: VecDeque<ClipItem>,
 }
@@ -66,7 +33,7 @@ impl Clip {
         if match clipboard_files::read() {
             Ok(file_paths) => {
                 log::debug!("clipboard files returned: {file_paths:?}");
-                self.add(ClipItem::FilePath(file_paths));
+                self.add(ClipItem::new_file_path(file_paths));
                 true
             }
             Err(clipboard_files::ClipboardError::NoFiles) => false,
@@ -84,7 +51,7 @@ impl Clip {
         if match app.clipboard().read_image() {
             Ok(image) => match create_base64_thumbnail(&image) {
                 Ok(thumbnail) => {
-                    self.add(ClipItem::Image((thumbnail, image.to_owned())));
+                    self.add(ClipItem::new_image(thumbnail, image.to_owned()));
                     true
                 }
                 Err(e) => {
@@ -103,7 +70,7 @@ impl Clip {
 
         match app.clipboard().read_text() {
             Ok(text) => {
-                self.add(ClipItem::Text(text));
+                self.add(ClipItem::new_text(text));
                 return true;
             }
             Err(e) => {
@@ -112,12 +79,34 @@ impl Clip {
             }
         }
     }
-    
+
     fn add(&mut self, clip_item: ClipItem) {
+        log::debug!("adding item to {:?}", clip_item);
         if self.history.len() == HISTORY_LEN {
             self.history.pop_back();
         }
         self.history.push_front(clip_item);
+    }
+
+    pub fn copy(&mut self, id: u32, app: &AppHandle) {
+        let item = self.history.iter().enumerate().find(|(_i, f)| id == f.id());
+        if let Some((index, item)) = item {
+            match item {
+                ClipItem::FilePath { paths, .. } => match clipboard_files::write(paths) {
+                    Err(e) => log::error!("Error writing file paths to clipboard: {}", e),
+                    Ok(_) => log::info!("Successfully wrote file paths to clipboard"),
+                },
+                ClipItem::Image { image, .. } => match app.clipboard().write_image(image) {
+                    Err(e) => log::error!("Error writing image to clipboard: {}", e),
+                    Ok(_) => log::info!("Successfully wrote image to clipboard"),
+                },
+                ClipItem::Text { text, .. } => match app.clipboard().write_text(text) {
+                    Err(e) => log::error!("Error writing image to clipboard: {}", e),
+                    Ok(_) => log::info!("Successfully wrote text to clipboard"),
+                },
+            }
+            self.history.remove(index);
+        }
     }
 }
 
