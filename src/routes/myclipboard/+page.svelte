@@ -5,34 +5,55 @@
   import ClipboardItem, { type ClipboardData } from "$lib/ClipboardItem.svelte";
 
   let clipboardContents: ClipboardData[] = $state([]);
-  let clipboardContentsDiv: HTMLDivElement | undefined = $state();
+  let selected = $state(0);
 
-  const focusFirstItem = () => {
-    if (
-      clipboardContentsDiv?.firstElementChild &&
-      clipboardContentsDiv.firstElementChild instanceof HTMLButtonElement
-    ) {
-      clipboardContentsDiv.firstElementChild.focus();
+  function handleKeydown(e: KeyboardEvent) {
+    if (e.key === "ArrowUp") {
+      if (selected == 0) {
+        selected = clipboardContents.length - 1;
+      } else {
+        selected -= 1;
+      }
+      e.preventDefault();
     }
-  };
+    if (e.key === "ArrowDown") {
+      if (selected == clipboardContents.length - 1) {
+        selected = 0;
+      } else {
+        selected += 1;
+      }
+      e.preventDefault();
+    }
+  }
 
-  onMount(async () => {
-    listen("window-shown", () => {
+  onMount(() => {
+    const unlistenWindowShown = listen("window-shown", () => {
       invoke("get_clipboard_contents");
     });
 
-    listen<ClipboardData[]>("clipboard-changed", (e) => {
-      console.log(e.payload);
-      clipboardContents = e.payload;
-      focusFirstItem();
-    });
-    await invoke("get_clipboard_contents");
+    const unlistenClipboardChange = listen<ClipboardData[]>(
+      "clipboard-changed",
+      (e) => {
+        clipboardContents = e.payload;
+        selected = 0;
+      },
+    );
+
+    document.addEventListener("keydown", handleKeydown);
+
+    invoke("get_clipboard_contents");
+
+    return async () => {
+      (await unlistenClipboardChange)();
+      (await unlistenWindowShown)();
+      document.removeEventListener("keydown", handleKeydown);
+    };
   });
 </script>
 
-<div class="items" bind:this={clipboardContentsDiv}>
-  {#each clipboardContents as clipboardData (clipboardData.id)}
-    <ClipboardItem {clipboardData} />
+<div class="items">
+  {#each clipboardContents as clipboardData, i (clipboardData.id)}
+    <ClipboardItem {clipboardData} index={i} {selected} />
   {/each}
 </div>
 
