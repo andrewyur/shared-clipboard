@@ -6,6 +6,8 @@
     import { page } from "$app/state";
     import { platform } from "@tauri-apps/plugin-os"
     import { onMount } from "svelte";
+    import { listen } from "@tauri-apps/api/event";
+    import { invoke } from "@tauri-apps/api/core";
     
     const { children } = $props()
 
@@ -25,13 +27,18 @@
 
     const tabs: Tab[] = [
         {
-            label: "my clipboard",
-            path: "/myclipboard",
+            label: "clipboard history",
+            path: "/history",
             icon: "mdi-clipboard"
         },
         {
+            label: "pinned",
+            path: "/pinned",
+            icon: "mdi-pin"
+        },
+        {
             label: "other devices",
-            path: "/otherdevices",
+            path: "/devices",
             icon: "mdi-monitor-multiple"
         }, 
         {
@@ -54,7 +61,17 @@
 
     onMount(() => {
         document.addEventListener("keydown", handleKeydown)
-        return () => {
+
+        const unlistenWindowShown = listen("window-shown", () => {
+            invoke("get_history");
+            invoke("get_pinned");
+        });
+        
+        invoke("get_history");
+        invoke("get_pinned");
+
+        return async () => {
+            (await unlistenWindowShown)()
             document.removeEventListener("keydown", handleKeydown)
         }
     })
@@ -66,11 +83,11 @@
     </button>
 </div>
 <nav id="tabs">
-    <span class="mdi mdi-arrow-left" tabindex="-1" style="opacity: 0.5; margin-right:20px"></span>
+    <span class="mdi mdi-arrow-left tab" tabindex="-1" style="opacity: 0.25; margin-right:20px"></span>
     {#each tabs as { path, icon, label }}
     <button class="tab" aria-label={label} onclick={() => goto(path)} class:active={page.route.id === path}><span class="mdi {icon}"></span></button>
     {/each}
-    <span class="mdi mdi-arrow-right" tabindex="-1" style="opacity: 0.5; margin-left:20px"></span>
+    <span class="mdi mdi-arrow-right tab" tabindex="-1" style="opacity: 0.25; margin-left:20px"></span>
 </nav>
 
 <main>
@@ -101,8 +118,9 @@
     }
 
     .tab {
-        font-size: large;
+        font-size: medium;
         border-radius: 5px;
+        color: #00000080
     }
     
     button {

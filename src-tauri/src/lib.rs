@@ -1,48 +1,23 @@
-mod clip;
-mod clip_item;
-mod handler;
+mod manager;
+mod item;
+mod watcher;
+mod commands;
 
 use std::error::Error;
 use std::sync::Mutex;
 
 use clipboard_master::Master;
-use tauri::{App, AppHandle, Emitter, Manager};
+use tauri::{App, Emitter, Manager as TauriManager};
 use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Modifiers, Shortcut};
 
-use crate::{clip::Clip, handler::Handler};
-
-#[tauri::command]
-async fn copy_item(
-    app: AppHandle,
-    state: tauri::State<'_, Mutex<Clip>>,
-    id: u32,
-) -> Result<(), String> {
-    log::info!("copying item with {}", id);
-    let mut clip = state
-        .lock()
-        .map_err(|e| format!("Could not access the clipboard handler {}", e))?;
-    clip.copy(id, &app);
-    app.get_webview_window("main").map(|w| w.hide());
-    Ok(())
-}
-
-#[tauri::command]
-async fn get_clipboard_contents(
-    app: AppHandle,
-    state: tauri::State<'_, Mutex<Clip>>,
-) -> Result<(), String> {
-    let clip = state
-        .lock()
-        .map_err(|e| format!("Could not access the clipboard handler {}", e))?;
-    app.emit("clipboard-changed", clip.values())
-        .map_err(|e| format!("Could not emit clipboard-changed event {}", e))?;
-    Ok(())
-}
+use crate::commands::{pin_item, get_pinned, unpin_item, copy_item, get_history};
+use crate::manager::Manager;
+use crate::watcher::Watcher;
 
 fn setup(app: &mut App) -> Result<(), Box<dyn Error>> {
-    app.manage(Mutex::new(Clip::new(app.handle())));
+    app.manage(Mutex::new(Manager::new(app.handle().clone())));
 
-    let mut watcher = Master::new(Handler::new(app.handle().clone()));
+    let mut watcher = Master::new(Watcher::new(app.handle().clone()));
     std::thread::spawn(move || {
         if let Err(e) = watcher.run() {
             log::error!("Clipboard change handler failed to start: {e}");
@@ -75,11 +50,11 @@ fn setup(app: &mut App) -> Result<(), Box<dyn Error>> {
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_os::init())
-        .plugin(tauri_plugin_log::Builder::new().build())
+        .plugin(tauri_plugin_log::Builder::new().level(log::LevelFilter::Debug).build())
         .plugin(tauri_plugin_clipboard_manager::init())
         .plugin(tauri_plugin_opener::init())
         .setup(setup)
-        .invoke_handler(tauri::generate_handler![get_clipboard_contents, copy_item])
+        .invoke_handler(tauri::generate_handler![get_history, copy_item, pin_item, get_pinned, unpin_item])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

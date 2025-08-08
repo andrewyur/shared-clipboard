@@ -7,8 +7,8 @@ use tauri::image::Image;
 
 static NEXT_ID: AtomicU32 = AtomicU32::new(0);
 
-#[derive(Debug)]
-pub enum ClipItem {
+#[derive(Debug, Clone)]
+pub enum Item {
     FilePath {
         paths: Vec<PathBuf>,
         id: u32,
@@ -28,7 +28,7 @@ pub trait HasId {
     fn id(&self) -> u32;
 }
 
-impl ClipItem {
+impl Item {
     pub fn new_file_path(paths: Vec<PathBuf>) -> Self {
         Self::FilePath {
             paths,
@@ -50,7 +50,7 @@ impl ClipItem {
     }
 }
 
-impl HasId for ClipItem {
+impl HasId for Item {
     fn id(&self) -> u32 {
         match self {
             Self::FilePath { id, .. } | Self::Image { id, .. } | Self::Text { id, .. } => *id,
@@ -58,7 +58,7 @@ impl HasId for ClipItem {
     }
 }
 
-impl serde::Serialize for ClipItem {
+impl serde::Serialize for Item {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: serde::Serializer,
