@@ -1,7 +1,8 @@
 mod manager;
-mod item;
+mod contents;
 mod watcher;
 mod commands;
+mod fs;
 
 use std::error::Error;
 use std::sync::Mutex;
@@ -10,7 +11,7 @@ use clipboard_master::Master;
 use tauri::{App, Emitter, Manager as TauriManager};
 use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Modifiers, Shortcut};
 
-use crate::commands::{pin_item, get_pinned, unpin_item, copy_item, get_history};
+use crate::commands::{pin_item, unpin_item, copy_item, request_update};
 use crate::manager::Manager;
 use crate::watcher::Watcher;
 
@@ -54,7 +55,7 @@ pub fn run() {
         .plugin(tauri_plugin_clipboard_manager::init())
         .plugin(tauri_plugin_opener::init())
         .setup(setup)
-        .invoke_handler(tauri::generate_handler![get_history, copy_item, pin_item, get_pinned, unpin_item])
+        .invoke_handler(tauri::generate_handler![copy_item, pin_item, unpin_item, request_update])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

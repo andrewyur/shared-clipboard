@@ -1,39 +1,63 @@
+import { listen } from "@tauri-apps/api/event";
 import { type Attachment } from "svelte/attachments";
-import { fromStore, type Readable } from "svelte/store";
 
-export function useSelect(store: Readable<unknown[]>) {
-    let selected = $state({ value: 0 })
-    const list = fromStore(store)
+export function useSelect(list: unknown[]) {
+    let selected = $state(0)
+    let update = $state(0)
+
+    $inspect(selected)
+
+    const refs: HTMLButtonElement[] = []
+
+    function register(index: number, element: HTMLButtonElement) {
+        console.log("registering")
+        refs[index] = element
+    } 
 
     function handleKeydown(e: KeyboardEvent) {
         if (e.key === "ArrowUp") {
-            if (selected.value == 0) {
-                selected.value = list.current.length - 1;
+            if (selected == 0) {
+                selected = list.length - 1;
             } else {
-                selected.value -= 1;
+                selected -= 1;
             }
             e.preventDefault();
         }
         if (e.key === "ArrowDown") {
-            if (selected.value == list.current.length - 1) {
-                selected.value = 0;
+            if (selected == list.length - 1) {
+                selected = 0;
             } else {
-                selected.value += 1;
+                selected += 1;
             }
             e.preventDefault();
         }
     }
 
-
     const selectAttachment: Attachment = (element) => {
         document.addEventListener("keydown", handleKeydown);
-        return () => {
+        const unlistenWindowShown = listen("window-shown", () => {
+            if( selected == 0 ) {
+                update += 1;
+            } else {
+                selected = 0
+            }
+        },);
+        return async () => {
+            (await unlistenWindowShown)()
             document.removeEventListener("keydown", handleKeydown);
         }
     }
 
+    $effect(() => {
+        void update
+        void selected
+        requestAnimationFrame(() => {
+            refs[selected]?.focus()
+        })
+    })
+
     return {
-        selected,
-        selectAttachment
+        register, 
+        selectAttachment,
     }
 }

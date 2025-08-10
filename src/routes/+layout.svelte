@@ -63,12 +63,11 @@
         document.addEventListener("keydown", handleKeydown)
 
         const unlistenWindowShown = listen("window-shown", () => {
-            invoke("get_history");
-            invoke("get_pinned");
+            invoke("request_update");
+            goto("/history")
         });
         
-        invoke("get_history");
-        invoke("get_pinned");
+        invoke("request_update");
 
         return async () => {
             (await unlistenWindowShown)()

@@ -1,22 +1,25 @@
 <script lang="ts">
     import { invoke } from "@tauri-apps/api/core";
-    import type { ItemData } from "./Contents"
-    import { pinnedIds } from "./Contents"
+    import type { ItemData } from "./State.svelte";
+    import { getCurrentWindow } from "@tauri-apps/api/window";
+    import { onMount } from "svelte";
 
     const {
         itemData,
         index,
-        selected,
+        register,
+        current = false,
     }: { 
         itemData: ItemData; 
         index: number; 
-        selected: { value: number} 
+        current?: boolean
+        register: (i: number, e: HTMLButtonElement) => void
     } = $props();
 
     const copyItem = () => invoke("copy_item", { id: itemData.id });
+    const hideWindow = () => getCurrentWindow().hide()
 
-    let itemRef: undefined | HTMLButtonElement = $state();
-    let isPinned: boolean = $derived($pinnedIds.has(itemData.id))
+    let itemRef: HTMLButtonElement;
 
     const pin = (e: MouseEvent) => {
         invoke("pin_item", { id: itemData.id })
@@ -25,11 +28,12 @@
         invoke("unpin_item", { id: itemData.id })
     }
 
-    $effect(() => {
-        if (selected.value === index) {
-            itemRef?.focus();
-        }
-    });
+    onMount(() => {
+        $effect(() => {
+            void index
+            register(index, itemRef)
+        })
+    })
 
     function handleFocus(e: FocusEvent) {
         requestAnimationFrame(() => {
@@ -41,26 +45,26 @@
     }
 </script>
 
-<div>
+<div style:--bg={current ? "#888" : "#fff"}>
     <button
         class="item"
-        onclick={copyItem}
+        onclick={current ? hideWindow : copyItem}
         tabindex={index + 1}
         bind:this={itemRef}
         onfocus={handleFocus}
     >
-        {#if itemData.kind === "text"}
-            <p>{itemData.content}</p>
-        {:else if itemData.kind === "paths"}
+        {#if itemData.contents.kind === "text"}
+            <p>{itemData.contents.content}</p>
+        {:else if itemData.contents.kind === "paths"}
             <p style="font-style:italic; color:gray">
-                {itemData.content.join("\n")}
+                {itemData.contents.content.join("\n")}
             </p>
         {:else}
-            <img src={itemData.content} alt="clipboard item" />
+            <img src={itemData.contents.content} alt="clipboard item" />
         {/if}
     </button>
     
-    {#if isPinned}
+    {#if itemData.is_pinned}
     <button class="action" aria-label="unpin the item" onclick={unpin}>
         <span class="mdi mdi-pin-off"></span>
     </button>
@@ -77,10 +81,14 @@
         width: 100%;
     }
 
+    .mdi {
+        opacity: 0.5;
+    }
+
     .item {
         height: 100px;
         width: 100%;
-        background-color: #fff;
+        background-color: var(--bg);
         padding: 10px;
         margin-bottom: 10px;
         border: 0;
@@ -99,8 +107,8 @@
         margin: 0;
         padding: 10px;
         font-size: small;
-        background-color: #fff;
-        border-radius: 0 12px 0 0 ;
+        background-color: var(--bg);
+        border-radius: 0 7px 0 0 ;
     }
 
     .item:focus {

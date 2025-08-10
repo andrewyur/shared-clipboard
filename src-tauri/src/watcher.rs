@@ -2,7 +2,7 @@ use std::io;
 use std::sync::Mutex;
 
 use clipboard_master::{CallbackResult, ClipboardHandler};
-use tauri::{AppHandle, Emitter, Manager as TauriManager};
+use tauri::{AppHandle, Manager as TauriManager};
 
 use crate::manager::Manager;
 
@@ -20,13 +20,8 @@ impl ClipboardHandler for Watcher {
     fn on_clipboard_change(&mut self) -> CallbackResult {
         let state = self.handle.state::<Mutex<Manager>>();
         match state.lock() {
-            Ok(mut clip) => {
-                clip.check();
-                if let Err(e) = self.handle.emit("history", clip.history()) {
-                    log::error!("Couldn't emit history event to frontend {}", e);
-                } else {
-                    log::info!("successfully emitted history event")
-                }
+            Ok(mut manager) => {
+                manager.check();
             }
             Err(e) => {
                 log::error!("Couldn't access clipboard manager: {}", e);

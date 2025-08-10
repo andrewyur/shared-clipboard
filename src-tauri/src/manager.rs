@@ -1,158 +1,132 @@
-use crate::item::{Item, HasId};
-use std::collections::VecDeque;
-use std::io::Cursor;
+use serde_json::json;
+use tauri::{AppHandle, Emitter};
 
-use base64::prelude::*;
-use image::imageops::thumbnail;
-use image::{ImageBuffer, ImageFormat, Rgba};
-use tauri::{image::Image, AppHandle};
-use tauri_plugin_clipboard_manager::ClipboardExt;
+use crate::contents::Contents;
+use std::collections::{HashMap, VecDeque};
+use std::sync::atomic::{AtomicU32, Ordering};
 
 const HISTORY_LEN: usize = 20;
-const THUMBNAIL_HEIGHT: u32 = 300;
+
+static NEXT_ID: AtomicU32 = AtomicU32::new(0);
+
+#[derive(serde::Serialize)]
+struct ManagedItem {
+    contents: Contents,
+    is_pinned: bool,        // whether to expose pin or unpin button
+    id: u32,                // items with the same id have the same contents
+}
+
+impl ManagedItem {
+    fn new(app: &AppHandle) -> Option<Self> {
+        Contents::try_from_clipboard(app).map(| contents | {
+            Self { 
+                contents, 
+                is_pinned: false, 
+                id: NEXT_ID.fetch_add(1, Ordering::Relaxed) 
+            }
+        })
+    }
+}
 pub struct Manager {
-    history: VecDeque<Item>,
-    pinned: Vec<Item>,
+    store: HashMap<u32, ManagedItem>,
+    history: VecDeque<u32>,
+    pinned: Vec<u32>,
+    ignore: bool,
     app: AppHandle
 }
 
 impl Manager {
     pub fn new(app: AppHandle) -> Self {
         log::info!("created clipboard manager");
-        let mut self_struct = Self {
-            history: VecDeque::with_capacity(HISTORY_LEN),
+        let mut store = HashMap::new();
+        let mut history = VecDeque::with_capacity(HISTORY_LEN);
+
+        if let Some(current_item)  = ManagedItem::new(&app) {
+            history.push_front(current_item.id);
+            store.insert(current_item.id, current_item);
+        }
+        
+        Self {
+            store,
+            history ,
             pinned: Vec::new(),
+            ignore: false,
             app
-        };
-        self_struct.check();
-        self_struct
-    }
-
-    pub fn history(&self) -> &VecDeque<Item> {
-        &self.history
-    }
-
-    pub fn check(&mut self) -> bool {
-        log::info!("Clibboard handler checking clibpoard");
-        if match clipboard_files::read() {
-            Ok(file_paths) => {
-                log::debug!("clipboard files returned: {file_paths:?}");
-                self.add(Item::new_file_path(file_paths));
-                true
-            }
-            Err(clipboard_files::ClipboardError::NoFiles) => false,
-            Err(e) => {
-                log::error!(
-                    "System returned an error when reading file paths from clipboard: {}",
-                    e
-                );
-                false
-            }
-        } {
-            return true;
         }
+    }
+    
+    pub fn emit(&self) {
+        let hydrated_history: Vec<&ManagedItem> = self.history.iter().map(|id| {
+            self.store.get(id).unwrap()
+        }).collect();
+        let hydrated_pinned: Vec<&ManagedItem> = self.pinned.iter().map(|id| {
+            self.store.get(id).unwrap()
+        }).collect();
 
-        if match self.app.clipboard().read_image() {
-            Ok(image) => match create_base64_thumbnail(&image) {
-                Ok(thumbnail) => {
-                    self.add(Item::new_image(thumbnail, image.to_owned()));
-                    true
+
+        let _ = self.app.emit("update", json!({
+            "history": hydrated_history,
+            "pinned": hydrated_pinned
+        }))
+            .map_err(|e| log::error!("Could not emit pinned event {}", e)); 
+    } 
+
+    // when this is called, we already know the current clipboard contents are outdated
+    pub fn check(&mut self) {
+        if self.ignore {
+            self.ignore = false
+        } else {
+            if let Some(new_item) = ManagedItem::new(&self.app) {
+                if self.history.len() == HISTORY_LEN {
+                    let popped = self.history.pop_back().unwrap();
+                    if !self.store.get(&popped).unwrap().is_pinned {
+                        self.store.remove(&popped);
+                    }
                 }
-                Err(e) => {
-                    log::error!("Could not create thumbnail for image in clipboard: {}", e);
-                    false
-                }
-            },
-            // no way to tell if this is because the clipboard has no images in it or because an actual error occured...
-            Err(e) => {
-                log::warn!("Possible error pasting image from clipboard: {e}");
-                false
-            }
-        } {
-            return true;
-        }
 
-        match self.app.clipboard().read_text() {
-            Ok(text) => {
-                self.add(Item::new_text(text));
-                return true;
+                self.history.push_front(new_item.id);
+                self.store.insert(new_item.id, new_item);
             }
-            Err(e) => {
-                log::warn!("Possible error pasting text from clipboard: {e}");
-                false
-            }
+            self.emit();
         }
-    }
-
-    fn add(&mut self, clip_item: Item) {
-        log::debug!("adding item to {:?}", clip_item);
-        if self.history.len() == HISTORY_LEN {
-            self.history.pop_back();
-        }
-        self.history.push_front(clip_item);
     }
 
     pub fn copy(&mut self, id: u32) {
-        let item = self.history.iter().enumerate().find(|(_i, f)| id == f.id());
-        if let Some((index, item)) = item {
-            match item {
-                Item::FilePath { paths, .. } => match clipboard_files::write(paths) {
-                    Err(e) => log::error!("Error writing file paths to clipboard: {}", e),
-                    Ok(_) => log::info!("Successfully wrote file paths to clipboard"),
-                },
-                Item::Image { image, .. } => match self.app.clipboard().write_image(image) {
-                    Err(e) => log::error!("Error writing image to clipboard: {}", e),
-                    Ok(_) => log::info!("Successfully wrote image to clipboard"),
-                },
-                Item::Text { text, .. } => match self.app.clipboard().write_text(text) {
-                    Err(e) => log::error!("Error writing image to clipboard: {}", e),
-                    Ok(_) => log::info!("Successfully wrote text to clipboard"),
-                },
+        if let Some((index, _)) = self.history.iter().enumerate().find(|(_, f_id )| id == **f_id) {
+            if index == 0 {
+                return // don't copy an item currently in the clipboard
             }
             self.history.remove(index);
+            self.history.push_front(id);
+        } else {
+            if self.history.len() == HISTORY_LEN {
+                let popped = self.history.pop_back().unwrap();
+                if !self.store.get(&popped).unwrap().is_pinned {
+                    self.store.remove(&popped);
+                }
+            }
+            self.history.push_front(id);
         }
-    }
 
-    pub fn pinned(&self) -> &Vec<Item>{
-        &self.pinned
+        self.ignore = true;
+        self.store.get(&id).unwrap().contents.try_to_clipboard(&self.app);
+        self.emit();
     }
 
     pub fn pin(&mut self, id: u32) {
-        let item = self.history.iter().enumerate().find(|(_i, f)| id == f.id());
-        if let Some((_, item)) = item {
-            self.pinned.push(item.clone());
+        if !self.pinned.contains(&id) {
+            self.pinned.insert(0, id);
+            self.store.get_mut(&id).unwrap().is_pinned = true;
+            self.emit();
         }
     }
-
-    pub fn unpin(&mut self, id: u32) {
-        let item = self.pinned.iter().enumerate().find(|(_i, f)| id == f.id());
-        if let Some((index, _)) = item {
+    
+    pub fn unpin(&mut self, id: u32) {        
+        if let Some((index, _)) = self.pinned.iter().enumerate().find(|(_, f_id )| id == **f_id) {
             self.pinned.remove(index);
+            self.store.get_mut(&id).unwrap().is_pinned = false;
+            self.emit();
         }
     }
 }
 
-fn create_base64_thumbnail(image: &Image) -> Result<String, String> {
-    let width = image.width();
-    let height = image.height();
-
-    let mut buffer: ImageBuffer<Rgba<u8>, _> =
-        ImageBuffer::from_raw(width, height, Vec::from(image.rgba()))
-            .ok_or("Could not convert provided image to an image buffer")?;
-
-    if height > THUMBNAIL_HEIGHT {
-        let new_height = THUMBNAIL_HEIGHT;
-        let new_width = ((width as f32 / height as f32) * THUMBNAIL_HEIGHT as f32).round() as u32;
-        buffer = thumbnail(&buffer, new_width, new_height);
-    }
-
-    let mut encoded = Cursor::new(Vec::new());
-    buffer
-        .write_to(&mut encoded, ImageFormat::Png)
-        .map_err(|e| format!("Could not convert image to png: {}", e))?;
-
-    Ok(format!(
-        "data:image/png;base64,{}",
-        BASE64_STANDARD.encode(encoded.into_inner())
-    ))
-}

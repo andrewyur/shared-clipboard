@@ -1,41 +1,23 @@
 <script lang="ts">
   import { invoke } from "@tauri-apps/api/core";
-  import { listen } from "@tauri-apps/api/event";
   import { onMount } from "svelte";
   import Item from "$lib/Item.svelte";
-  import { history } from "$lib/Contents";
+  import { state } from "$lib/State.svelte";
   import { useSelect } from "$lib/Select.svelte";
 
-  const { selected, selectAttachment } = useSelect(history);
+  const { selectAttachment, register } = useSelect(state.history);
 
   onMount(() => {
-    const unlistenWindowShown = listen("window-shown", () => {
-      selected.value = 0;
-      invoke("get_history");
-      invoke("get_pinned");
-    });
-
-    const unlistenClipboardChange = listen(
-      "history",
-      () => (selected.value = 0),
-    );
-
-    invoke("get_history");
-    invoke("get_pinned");
-
-    return async () => {
-      (await unlistenClipboardChange)();
-      (await unlistenWindowShown)();
-    };
+    invoke("request_update");
   });
 </script>
 
 <div class="items" {@attach selectAttachment}>
-  {#if $history.length === 0}
-    <p style="font-style: italic; opacity: 0.5;">Clipboard is Empty...</p>
+  {#if state.history.length === 0}
+    <p style="font-style: italic; opacity: 0.5;">No Clipboard History yet...</p>
   {:else}
-    {#each $history as item, i (item.id)}
-      <Item itemData={item} index={i} {selected} />
+    {#each state.history as item, i (item.id)}
+      <Item itemData={item} index={i} {register} />
     {/each}
   {/if}
 </div>
