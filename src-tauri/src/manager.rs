@@ -1,7 +1,7 @@
 use serde_json::json;
 use tauri::{AppHandle, Emitter};
 
-use crate::contents::Contents;
+use crate::contents::{load_pinned, store_pinned, Contents};
 use std::collections::{HashMap, VecDeque};
 use std::sync::atomic::{AtomicU32, Ordering};
 
@@ -12,19 +12,24 @@ static NEXT_ID: AtomicU32 = AtomicU32::new(0);
 #[derive(serde::Serialize)]
 struct ManagedItem {
     contents: Contents,
-    is_pinned: bool,        // whether to expose pin or unpin button
-    id: u32,                // items with the same id have the same contents
+    is_pinned: bool, // whether to expose pin or unpin button
+    id: u32,         // items with the same id have the same contents
 }
 
 impl ManagedItem {
-    fn new(app: &AppHandle) -> Option<Self> {
-        Contents::try_from_clipboard(app).map(| contents | {
-            Self { 
-                contents, 
-                is_pinned: false, 
-                id: NEXT_ID.fetch_add(1, Ordering::Relaxed) 
-            }
+    fn try_from_clipboard(app: &AppHandle) -> Option<Self> {
+        Contents::try_from_clipboard(app).map(|contents| Self {
+            contents,
+            is_pinned: false,
+            id: NEXT_ID.fetch_add(1, Ordering::Relaxed),
         })
+    }
+    fn from_contents(contents: Contents, is_pinned: bool) -> Self {
+        Self { 
+            contents, 
+            is_pinned, 
+            id: NEXT_ID.fetch_add(1, Ordering::Relaxed)
+        }
     }
 }
 pub struct Manager {
@@ -32,7 +37,7 @@ pub struct Manager {
     history: VecDeque<u32>,
     pinned: Vec<u32>,
     ignore: bool,
-    app: AppHandle
+    app: AppHandle,
 }
 
 impl Manager {
@@ -41,42 +46,60 @@ impl Manager {
         let mut store = HashMap::new();
         let mut history = VecDeque::with_capacity(HISTORY_LEN);
 
-        if let Some(current_item)  = ManagedItem::new(&app) {
+        if let Some(current_item) = ManagedItem::try_from_clipboard(&app) {
             history.push_front(current_item.id);
             store.insert(current_item.id, current_item);
         }
-        
+
+        let pinned = load_pinned(&app).unwrap_or_else(|e| {
+            log::error!("Unable to load pinned items: {:#}", e);
+            vec![]
+        }).into_iter().map(|c| {
+            let item = ManagedItem::from_contents(c, true);
+            let item_id = item.id;
+            store.insert(item_id, item);
+            item_id
+        }).collect();
+
         Self {
             store,
-            history ,
-            pinned: Vec::new(),
+            history,
+            pinned,
             ignore: false,
-            app
+            app,
         }
     }
-    
+
     pub fn emit(&self) {
-        let hydrated_history: Vec<&ManagedItem> = self.history.iter().map(|id| {
-            self.store.get(id).unwrap()
-        }).collect();
-        let hydrated_pinned: Vec<&ManagedItem> = self.pinned.iter().map(|id| {
-            self.store.get(id).unwrap()
-        }).collect();
+        let hydrated_history: Vec<&ManagedItem> = self
+            .history
+            .iter()
+            .map(|id| self.store.get(id).unwrap())
+            .collect();
+        let hydrated_pinned: Vec<&ManagedItem> = self
+            .pinned
+            .iter()
+            .map(|id| self.store.get(id).unwrap())
+            .collect();
 
-
-        let _ = self.app.emit("update", json!({
-            "history": hydrated_history,
-            "pinned": hydrated_pinned
-        }))
-            .map_err(|e| log::error!("Could not emit pinned event {}", e)); 
-    } 
+        let _ = self
+            .app
+            .emit(
+                "update",
+                json!({
+                    "history": hydrated_history,
+                    "pinned": hydrated_pinned
+                }),
+            )
+            .map_err(|e| log::error!("Could not emit pinned event {}", e));
+    }
 
     // when this is called, we already know the current clipboard contents are outdated
     pub fn check(&mut self) {
         if self.ignore {
             self.ignore = false
         } else {
-            if let Some(new_item) = ManagedItem::new(&self.app) {
+            if let Some(new_item) = ManagedItem::try_from_clipboard(&self.app) {
                 if self.history.len() == HISTORY_LEN {
                     let popped = self.history.pop_back().unwrap();
                     if !self.store.get(&popped).unwrap().is_pinned {
@@ -92,9 +115,14 @@ impl Manager {
     }
 
     pub fn copy(&mut self, id: u32) {
-        if let Some((index, _)) = self.history.iter().enumerate().find(|(_, f_id )| id == **f_id) {
+        if let Some((index, _)) = self
+            .history
+            .iter()
+            .enumerate()
+            .find(|(_, f_id)| id == **f_id)
+        {
             if index == 0 {
-                return // don't copy an item currently in the clipboard
+                return; // don't copy an item currently in the clipboard
             }
             self.history.remove(index);
             self.history.push_front(id);
@@ -109,7 +137,11 @@ impl Manager {
         }
 
         self.ignore = true;
-        self.store.get(&id).unwrap().contents.try_to_clipboard(&self.app);
+        self.store
+            .get(&id)
+            .unwrap()
+            .contents
+            .try_to_clipboard(&self.app);
         self.emit();
     }
 
@@ -118,15 +150,45 @@ impl Manager {
             self.pinned.insert(0, id);
             self.store.get_mut(&id).unwrap().is_pinned = true;
             self.emit();
+            self.save_pinned();
+        } else {
+            log::warn!("tried to pin an item that was already in the pinned items vec");
+            log::warn!("{}, {:?}", id, self.pinned);
         }
     }
-    
-    pub fn unpin(&mut self, id: u32) {        
-        if let Some((index, _)) = self.pinned.iter().enumerate().find(|(_, f_id )| id == **f_id) {
+
+    pub fn unpin(&mut self, id: u32) {
+        if let Some((index, _)) = self
+            .pinned
+            .iter()
+            .enumerate()
+            .find(|(_, f_id)| id == **f_id)
+        {
             self.pinned.remove(index);
-            self.store.get_mut(&id).unwrap().is_pinned = false;
+
+            if self.history.contains(&id) {
+                self.store.get_mut(&id).unwrap().is_pinned = false;
+            } else {
+                self.store.remove(&id);
+            }
             self.emit();
+            self.save_pinned();
+        } else {
+            log::warn!("tried to unpin an item that wasnt in the pinned items vec");
+            log::warn!("{}, {:?}", id, self.pinned);
+        }
+    }
+
+    fn save_pinned(&self) {
+        let pinned_contents = self.store.values().filter_map(|f| {
+            if f.is_pinned {
+                Some(&f.contents)
+            } else {
+                None
+            }
+        }).collect::<Vec<_>>();
+        if let Err(e) = store_pinned(&pinned_contents, &self.app) {
+            log::error!("Could not store pinned items: {:#}", e)
         }
     }
 }
-

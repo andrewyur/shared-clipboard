@@ -18,10 +18,10 @@ impl Watcher {
 
 impl ClipboardHandler for Watcher {
     fn on_clipboard_change(&mut self) -> CallbackResult {
-        let state = self.handle.state::<Mutex<Manager>>();
+        let state = self.handle.state::<Mutex<Option<Manager>>>();
         match state.lock() {
             Ok(mut manager) => {
-                manager.check();
+                manager.as_mut().map(|m| m.check());
             }
             Err(e) => {
                 log::error!("Couldn't access clipboard manager: {}", e);
