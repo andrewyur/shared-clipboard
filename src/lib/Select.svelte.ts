@@ -10,7 +10,6 @@ export function useSelect(list: unknown[]) {
     const refs: HTMLButtonElement[] = []
 
     function register(index: number, element: HTMLButtonElement) {
-        console.log("registering")
         refs[index] = element
     } 
 

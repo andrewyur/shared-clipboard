@@ -1,14 +1,15 @@
+use anyhow::{anyhow, Context};
 use base64::{prelude::BASE64_STANDARD, Engine};
 use image::{imageops::thumbnail, ImageBuffer, ImageFormat, Rgba};
 use serde::ser::SerializeStruct;
+use serde_json::json;
+use std::fs;
 use std::{io::Cursor, path::PathBuf};
+use tauri::Manager;
 use tauri::{image::Image, AppHandle};
 use tauri_plugin_clipboard_manager::ClipboardExt;
-use anyhow::{anyhow, Context};
-use serde_json::json;
-use tauri::Manager;
 use tauri_plugin_store::StoreExt;
-use std::fs;
+use crate::clipboard_files;
 
 const THUMBNAIL_HEIGHT: u32 = 300;
 const PINNED_STORE: &str = "pinned.json";
@@ -112,8 +113,9 @@ fn create_base64_thumbnail(image: &Image) -> Result<String, anyhow::Error> {
     let height = image.height();
 
     let mut buffer: ImageBuffer<Rgba<u8>, _> =
-        ImageBuffer::from_raw(width, height, Vec::from(image.rgba()))
-            .ok_or(anyhow!("Could not convert provided image to an image buffer"))?;
+        ImageBuffer::from_raw(width, height, Vec::from(image.rgba())).ok_or(anyhow!(
+            "Could not convert provided image to an image buffer"
+        ))?;
 
     if height > THUMBNAIL_HEIGHT {
         let new_height = THUMBNAIL_HEIGHT;
@@ -132,66 +134,83 @@ fn create_base64_thumbnail(image: &Image) -> Result<String, anyhow::Error> {
     ))
 }
 
-
-pub fn store_pinned(contents: &Vec<&Contents>, app: &AppHandle) -> Result<(), anyhow::Error>{
-    let store = app.store(PINNED_STORE).with_context(|| "failed to get pinned items store")?;
+pub fn store_pinned(contents: &Vec<&Contents>, app: &AppHandle) -> Result<(), anyhow::Error> {
+    let store = app
+        .store(PINNED_STORE)
+        .with_context(|| "failed to get pinned items store")?;
     log::debug!("created store");
 
-    let mut images_directory = app.path()
-        .app_local_data_dir().with_context(|| "failed to get app local data dir")?;
+    let mut images_directory = app
+        .path()
+        .app_local_data_dir()
+        .with_context(|| "failed to get app local data dir")?;
 
-    images_directory.push("images");   
+    images_directory.push("images");
 
-    
     if images_directory.exists() {
         log::debug!("clearing images dir ");
-        fs::remove_dir_all(&images_directory)
-        .with_context(|| format!("failed clear the image data dir at {}", images_directory.display()))?;
+        fs::remove_dir_all(&images_directory).with_context(|| {
+            format!(
+                "failed clear the image data dir at {}",
+                images_directory.display()
+            )
+        })?;
     }
-    log::debug!("creating image data dir "); 
-    fs::create_dir_all(&images_directory)
-        .with_context(|| format!("failed create the image data dir at {}", images_directory.display()))?;
-
+    log::debug!("creating image data dir ");
+    fs::create_dir_all(&images_directory).with_context(|| {
+        format!(
+            "failed create the image data dir at {}",
+            images_directory.display()
+        )
+    })?;
 
     let mut image_file_name = 0;
-    
-    let serialized = contents.iter().map(| c | {
-        match c {
+
+    let serialized = contents
+        .iter()
+        .map(|c| match c {
             Contents::FilePath { paths } => Ok(json!({"type": "paths", "content": paths})),
             Contents::Text { text } => Ok(json!({"type": "text", "content": text})),
-            Contents::Image { image, .. } => {           
+            Contents::Image { image, .. } => {
                 image_file_name += 1;
                 let mut image_path = images_directory.clone();
                 image_path.push(image_file_name.to_string());
-                log::debug!("writing image data at {}", &image_path.display()); 
-                fs::write(&image_path, image.rgba())
-                    .with_context(|| format!("failed to write image data to {}", image_path.display()))?;
+                log::debug!("writing image data at {}", &image_path.display());
+                fs::write(&image_path, image.rgba()).with_context(|| {
+                    format!("failed to write image data to {}", image_path.display())
+                })?;
                 Ok(json!({ "type": "image", "content": {
                     "file": image_file_name.to_string(),
                     "height": image.height(),
                     "width": image.width()
                 }}))
             }
-        }
-    }).collect::<Result<Vec<_>, anyhow::Error>>()?;
+        })
+        .collect::<Result<Vec<_>, anyhow::Error>>()?;
 
-    log::debug!("storing pinned data"); 
+    log::debug!("storing pinned data");
     store.set("pinned", serialized);
 
     Ok(())
 }
 
 pub fn load_pinned(app: &AppHandle) -> Result<Vec<Contents>, anyhow::Error> {
-    let store = app.store(PINNED_STORE).with_context(|| "failed to get or create pinned items store")?;
+    let store = app
+        .store(PINNED_STORE)
+        .with_context(|| "failed to get or create pinned items store")?;
 
-    let mut images_directory = app.path()
-    .app_local_data_dir().with_context(|| "failed to get app local data dir")?;
+    let mut images_directory = app
+        .path()
+        .app_local_data_dir()
+        .with_context(|| "failed to get app local data dir")?;
 
-    images_directory.push("images");  
+    images_directory.push("images");
 
     if let Some(pinned) = store.get("pinned") {
         store.close_resource();
-        let items = pinned.as_array().ok_or_else(|| anyhow!("Value for pinned key was not an array"))?;
+        let items = pinned
+            .as_array()
+            .ok_or_else(|| anyhow!("Value for pinned key was not an array"))?;
         items.iter().map(|i| {
                 let json_obj = i.as_object().ok_or_else(|| anyhow!("item in pinned array was not object"))?;
                 let type_str = json_obj

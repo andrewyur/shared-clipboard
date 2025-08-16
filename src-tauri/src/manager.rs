@@ -25,10 +25,10 @@ impl ManagedItem {
         })
     }
     fn from_contents(contents: Contents, is_pinned: bool) -> Self {
-        Self { 
-            contents, 
-            is_pinned, 
-            id: NEXT_ID.fetch_add(1, Ordering::Relaxed)
+        Self {
+            contents,
+            is_pinned,
+            id: NEXT_ID.fetch_add(1, Ordering::Relaxed),
         }
     }
 }
@@ -51,15 +51,19 @@ impl Manager {
             store.insert(current_item.id, current_item);
         }
 
-        let pinned = load_pinned(&app).unwrap_or_else(|e| {
-            log::error!("Unable to load pinned items: {:#}", e);
-            vec![]
-        }).into_iter().map(|c| {
-            let item = ManagedItem::from_contents(c, true);
-            let item_id = item.id;
-            store.insert(item_id, item);
-            item_id
-        }).collect();
+        let pinned = load_pinned(&app)
+            .unwrap_or_else(|e| {
+                log::error!("Unable to load pinned items: {:#}", e);
+                vec![]
+            })
+            .into_iter()
+            .map(|c| {
+                let item = ManagedItem::from_contents(c, true);
+                let item_id = item.id;
+                store.insert(item_id, item);
+                item_id
+            })
+            .collect();
 
         Self {
             store,
@@ -180,13 +184,11 @@ impl Manager {
     }
 
     fn save_pinned(&self) {
-        let pinned_contents = self.store.values().filter_map(|f| {
-            if f.is_pinned {
-                Some(&f.contents)
-            } else {
-                None
-            }
-        }).collect::<Vec<_>>();
+        let pinned_contents = self
+            .store
+            .values()
+            .filter_map(|f| if f.is_pinned { Some(&f.contents) } else { None })
+            .collect::<Vec<_>>();
         if let Err(e) = store_pinned(&pinned_contents, &self.app) {
             log::error!("Could not store pinned items: {:#}", e)
         }

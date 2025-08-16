@@ -57,6 +57,9 @@
         if(e.key === "ArrowRight") {
             goto(tabs[Math.min(tabIndex + 1, tabs.length - 1)].path)
         }
+        if(e.key === "Escape") {
+            hideWindow()
+        }
     }
 
     onMount(() => {
