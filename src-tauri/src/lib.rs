@@ -16,11 +16,11 @@ use crate::manager::Manager;
 use crate::watcher::Watcher;
 
 fn setup(app: &mut App) -> Result<(), Box<dyn Error>> {
-    app.set_dock_visibility(false);
-
-    // refocus app when workspace is switched to the window's active workspace
     #[cfg(target_os = "macos")]
     {
+        app.set_dock_visibility(false);
+
+        // refocus app when workspace is switched to the window's active workspace, dock visibility
         use objc2_app_kit::{NSWorkspace, NSWindow};
         use objc2_foundation::{NSNotificationName, NSNotification, NSOperationQueue};
         use block2::RcBlock;
@@ -40,19 +40,23 @@ fn setup(app: &mut App) -> Result<(), Box<dyn Error>> {
             let queue = NSOperationQueue::mainQueue();
             center.addObserverForName_object_queue_usingBlock(Some(&name), None, Some(&queue), &*block);
         }
+        
+        // set window to move into active workspace when shown
+        app.get_webview_window("main").map(|w| {
+            {
+                use objc2_app_kit::{NSWindow, NSWindowCollectionBehavior};
+                let ns_window_ptr = w.ns_window().unwrap();
+                unsafe {
+                    let ns_window = &mut *(ns_window_ptr as *mut NSWindow);
+                    ns_window.setCollectionBehavior(NSWindowCollectionBehavior::MoveToActiveSpace);
+                }
+            }
+        });
     }
 
-    // set window to move into active workspace when shown
+    #[cfg(not(target_os = "macos"))]
     app.get_webview_window("main").map(|w| {
-        #[cfg(target_os = "macos")]
-        {
-            use objc2_app_kit::{NSWindow, NSWindowCollectionBehavior};
-            let ns_window_ptr = w.ns_window().unwrap();
-            unsafe {
-                let ns_window = &mut *(ns_window_ptr as *mut NSWindow);
-                ns_window.setCollectionBehavior(NSWindowCollectionBehavior::MoveToActiveSpace);
-            }
-        }
+        w.set_skip_taskbar(true)
     });
 
     app.manage(Mutex::new(Some(Manager::new(app.handle().clone()))));

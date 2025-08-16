@@ -1,13 +1,16 @@
 <script lang="ts">
     import "../app.css";
-    import '@mdi/font/css/materialdesignicons.css'
+    import '@jamescoyle/svg-icon'
+    import 'overlayscrollbars/overlayscrollbars.css';
+    import { mdiClose, mdiArrowRight, mdiArrowLeft, mdiClipboard, mdiPin, mdiMonitorMultiple, mdiCog } from "@mdi/js"
     import { goto } from "$app/navigation";
     import { getCurrentWindow } from "@tauri-apps/api/window";
     import { page } from "$app/state";
     import { platform } from "@tauri-apps/plugin-os"
-    import { onMount } from "svelte";
+    import { onMount, tick } from "svelte";
     import { listen } from "@tauri-apps/api/event";
     import { invoke } from "@tauri-apps/api/core";
+    import { OverlayScrollbars } from "overlayscrollbars"
     
     const { children } = $props()
 
@@ -15,7 +18,8 @@
         getCurrentWindow().hide();
     }
 
-    if (platform() === 'macos') {
+    const mac = platform() === 'macos'
+    if (mac) {
         document.body.classList.add("macos")
     }
 
@@ -29,22 +33,22 @@
         {
             label: "clipboard history",
             path: "/history",
-            icon: "mdi-clipboard"
+            icon: mdiClipboard
         },
         {
             label: "pinned",
             path: "/pinned",
-            icon: "mdi-pin"
+            icon: mdiPin
         },
         {
             label: "other devices",
             path: "/devices",
-            icon: "mdi-monitor-multiple"
+            icon: mdiMonitorMultiple
         }, 
         {
             label: "settings",
             path: "/settings",
-            icon: "mdi-cog"
+            icon: mdiCog
         }
     ]
 
@@ -62,8 +66,23 @@
         }
     }
 
+    function handleBlur() {
+        console.log("blurred")
+        setTimeout(() => {
+            if(!document.hasFocus()) {
+                hideWindow()
+            }
+        }, 100)
+    }
+
+    
     onMount(() => {
+        tick().then(() => {
+            OverlayScrollbars(document.querySelector('main') as HTMLElement, {});
+        })
+
         document.addEventListener("keydown", handleKeydown)
+        window.addEventListener("blur", handleBlur)
 
         const unlistenWindowShown = listen("window-shown", () => {
             invoke("request_update");
@@ -75,21 +94,23 @@
         return async () => {
             (await unlistenWindowShown)()
             document.removeEventListener("keydown", handleKeydown)
+            window.removeEventListener("blur", handleBlur)
         }
     })
 </script>
 
 <div id="titleBar" data-tauri-drag-region>
     <button id="closeButton" aria-label="hides window" onclick={hideWindow}>
-        <span class="mdi mdi-close"></span>
+        <svg-icon class="cross" type="mdi" path={mdiClose} size="20"></svg-icon>
     </button>
 </div>
 <nav id="tabs">
-    <span class="mdi mdi-arrow-left tab" tabindex="-1" style="opacity: 0.25; margin-right:20px"></span>
+    <svg-icon size="20" type="mdi" path={mdiArrowLeft} tabindex="-1" style="opacity: 0.25; margin-right:20px"></svg-icon>
     {#each tabs as { path, icon, label }}
-    <button class="tab" aria-label={label} onclick={() => goto(path)} class:active={page.route.id === path}><span class="mdi {icon}"></span></button>
+    <button class="tab" aria-label={label} onclick={() => goto(path)} class:active={page.route.id === path}><svg-icon type="mdi" size="20" path={icon}></svg-icon></button>
     {/each}
-    <span class="mdi mdi-arrow-right tab" tabindex="-1" style="opacity: 0.25; margin-left:20px"></span>
+    <svg-icon size="20" type="mdi" path={mdiArrowRight} tabindex="-1" style="opacity: 0.25; margin-left:20px"></svg-icon>
+
 </nav>
 
 <main>
@@ -97,13 +118,25 @@
 </main>
 
 <style>
-    .mdi-close {
-        font-size: 1.5em;
+    svg-icon {
+        opacity: 0.5;
+    }
+
+    .cross:hover {
+        background-color: #fff;
+        width: 100%;
+        height: 100%;
+        border-radius: 5px;
+    }
+
+    #closeButton {
+        width: 45px;
+        height: 35px;
+        padding: 5px;
     }
 
     #titleBar {
         width: 100%;
-        height: 28px;
         display: flex;
         flex-direction: row;
         align-items: center;
@@ -114,7 +147,7 @@
         display: flex;
         justify-content: center;
         align-items: center;
-        margin-top: -10px;
+        margin-top: 0;
         gap: 5px;
         padding-bottom: 10px;
     }
@@ -122,12 +155,15 @@
     .tab {
         font-size: medium;
         border-radius: 5px;
-        color: #00000080
+        height: 30px;
+        width: 30px;
     }
     
     button {
         background-color: transparent;
         border: 0;
+        margin: 0;
+        padding: 5px;
     }
 
     .active {
@@ -143,8 +179,7 @@
         gap: 20px;
         display: flex;
         flex-direction: column;
-        overflow-y: scroll;
-        scrollbar-width: thin;
+        /* overflow-y: scroll; */
         padding-top: 10px;
         scroll-behavior: smooth;
     }

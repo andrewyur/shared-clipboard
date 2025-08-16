@@ -2,9 +2,8 @@ use std::path::PathBuf;
 use std::ptr::copy_nonoverlapping;
 use crate::clipboard_files::ClipboardError;
 use windows::Win32::{
-    Foundation::{HWND, HANDLE, GetLastError, ERROR_SUCCESS},
-    System::Memory::{GlobalAlloc, GlobalLock, GlobalUnlock, GMEM_MOVEABLE}, 
-    System::Ole::CF_HDROP,
+    Foundation::{GetLastError, ERROR_SUCCESS, HANDLE, HWND},
+    System::{DataExchange::{EnumClipboardFormats, GetClipboardFormatNameW}, Memory::{GlobalAlloc, GlobalLock, GlobalUnlock, GMEM_MOVEABLE}, Ole::CF_HDROP}, 
     UI::Shell::{DragQueryFileW, DROPFILES, HDROP},
 };
 use windows::Win32::System::DataExchange::{
@@ -44,10 +43,20 @@ impl Drop for ClipboardGuard {
 pub(crate) fn read_clipboard() -> Result<Vec<PathBuf>, ClipboardError> {
     let mut paths = Vec::new();
     
-    // when this is dropped, clipboard gets closed closed
+    // when this is dropped, clipboard gets closed
     let _guard = ClipboardGuard::open()?;
 
-    unsafe { IsClipboardFormatAvailable(CF_HDROP.0.into()) }.map_err(|_| ClipboardError::NoFiles)?;
+    unsafe { IsClipboardFormatAvailable(CF_HDROP.0.into()) }.map_err(|e|{
+        log::debug!(" IsClipboardFormatAvailable(CF_HDROP.0.into()) returned error: {}", e);
+        
+        let available_format = unsafe { EnumClipboardFormats(0) };
+        let mut buffer = vec![0u16; 256];
+        unsafe { GetClipboardFormatNameW(available_format, buffer.as_mut_slice()); };
+    
+        log::info!("available format: {}", String::from_utf16_lossy(&buffer));
+        
+        ClipboardError::NoFiles
+    })?;
 
     let hdrop_data =  unsafe { GetClipboardData(CF_HDROP.0.into()) }?;
     let hdrop = HDROP(hdrop_data.0);

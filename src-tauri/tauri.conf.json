@@ -23,7 +23,7 @@
         "minimizable": false,
         "decorations": false,
         "windowEffects": {
-          "effects": ["popover"],
+          "effects": ["popover", "mica"],
           "radius": 9,
           "state": "active"
         }

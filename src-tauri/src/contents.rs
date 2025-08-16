@@ -5,6 +5,7 @@ use serde::ser::SerializeStruct;
 use serde_json::json;
 use std::fs;
 use std::{io::Cursor, path::PathBuf};
+use std::sync::mpsc;
 use tauri::Manager;
 use tauri::{image::Image, AppHandle};
 use tauri_plugin_clipboard_manager::ClipboardExt;
@@ -30,7 +31,27 @@ pub enum Contents {
 
 impl Contents {
     pub fn try_from_clipboard(app: &AppHandle) -> Option<Self> {
-        log::info!("Clibboard handler checking clibpoard");
+        let ( tx, rx ) = mpsc::channel();
+        let app_clone = app.clone();
+
+        if let Err(e) = app.run_on_main_thread(move || {
+            let _ = tx.send(Self::_try_from_clipboard(&app_clone));
+        }) {
+            log::error!("Could not run 'Item::_try_from_clipboard' on main thread: {}", e);
+            return None
+        }
+
+        match rx.recv() {
+            Err(e) => {
+                log::error!("Error recieving value from main thread in 'Item::_try_from_clipboard': {}", e);
+                None
+            },
+            Ok(res) => res
+        }
+    }
+
+    fn _try_from_clipboard(app: &AppHandle) -> Option<Self> {
+                log::info!("Clipboard handler checking clipboard");
         match clipboard_files::read() {
             Ok(paths) => return Some(Self::FilePath { paths }),
             Err(clipboard_files::ClipboardError::NoFiles) => {}

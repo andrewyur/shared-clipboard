@@ -3,6 +3,8 @@
     import type { ItemData } from "./State.svelte";
     import { getCurrentWindow } from "@tauri-apps/api/window";
     import { onMount } from "svelte";
+    import "@jamescoyle/svg-icon"
+    import { mdiPin, mdiPinOutline } from "@mdi/js"
 
     const {
         itemData,
@@ -18,6 +20,8 @@
 
     const copyItem = () => invoke("copy_item", { id: itemData.id });
     const hideWindow = () => getCurrentWindow().hide()
+
+    let hovered = $state(false)
 
     let itemRef: HTMLButtonElement;
 
@@ -45,7 +49,12 @@
     }
 </script>
 
-<div style:--bg={current ? "#888" : "#fff"}>
+<!-- svelte-ignore a11y_no_static_element_interactions -->
+<div 
+    onmouseenter={() => hovered = true}
+    onmouseleave={() => hovered = false}
+    class:hover={hovered}
+>
     <button
         class="item"
         onclick={current ? hideWindow : copyItem}
@@ -66,11 +75,11 @@
     
     {#if itemData.is_pinned}
     <button class="action" aria-label="unpin the item" onclick={unpin}>
-        <span class="mdi mdi-pin-off"></span>
+        <svg-icon type="mdi" size="15" path={mdiPin}></svg-icon>
     </button>
     {:else}
     <button class="action" aria-label="pin the item" onclick={pin}>
-        <span class="mdi mdi-pin"></span>
+        <svg-icon type="mdi" size="15" path={mdiPinOutline}></svg-icon>
     </button>
     {/if}
 </div>
@@ -81,22 +90,22 @@
         width: 100%;
     }
 
-    .mdi {
+    svg-icon {
         opacity: 0.5;
     }
 
     .item {
         height: 100px;
         width: 100%;
-        background-color: var(--bg);
+        background-color: #fff;
         padding: 10px;
         margin-bottom: 10px;
         border: 0;
         border-radius: 7px;
         position: relative;
-        outline: none;
+        outline: 3px solid rgba(0, 0, 0, 0);
         padding: 10px;
-        transition: outline 0.1s ease-in-out;
+        transition: outline 0.2s ease-in-out;
     }
 
     .action {
@@ -104,15 +113,26 @@
         top: 0;
         right: 0;
         border: 0;
+        padding: 7px;
         margin: 0;
-        padding: 10px;
         font-size: small;
-        background-color: var(--bg);
-        border-radius: 0 7px 0 0 ;
+        background-color: #fff;
+        border-radius: 7px;
+        margin: 3px;
+        height: 29px;
+        width: 29px;
+    }
+
+    .action:hover {
+        background-color: rgb(238, 238, 238)
     }
 
     .item:focus {
-        outline: 3px solid black;
+        outline-color: rgba(0, 0, 0, 1);
+    }
+
+    .hover > .item {
+        box-shadow: 0px 0px 5px 2px rgb(215, 215, 215) ;
     }
 
     p {
