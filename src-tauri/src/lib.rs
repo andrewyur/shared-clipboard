@@ -80,6 +80,7 @@ fn setup(app: &mut App) -> Result<(), Box<dyn Error>> {
                     app.emit("window-shown", {})
                         .expect("Could not emit clipboard-changed event");
                     app.get_webview_window("main").map(|w| {
+                        let _ = app.cursor_position().map(|p| {w.set_position(p)});
                         w.show()?;
                         w.set_focus()
                     });
