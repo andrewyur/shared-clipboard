@@ -1,1 +1,0 @@
-https://crates.io/crates/tauri-plugin-macos-permissions

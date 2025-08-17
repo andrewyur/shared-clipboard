@@ -9,7 +9,7 @@ use std::sync::Mutex;
 
 use clipboard_master::Master;
 use tauri::{App, Emitter, Manager as TauriManager};
-use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Modifiers, Shortcut};
+use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Modifiers, Shortcut, ShortcutState};
 
 use crate::commands::{copy_item, pin_item, request_update, unpin_item};
 use crate::manager::Manager;
@@ -18,7 +18,7 @@ use crate::watcher::Watcher;
 fn setup(app: &mut App) -> Result<(), Box<dyn Error>> {
     #[cfg(target_os = "macos")]
     {
-        app.set_dock_visibility(false);
+        // app.set_dock_visibility(false);
 
         // refocus app when workspace is switched to the window's active workspace, dock visibility
         use objc2_app_kit::{NSWorkspace, NSWindow};
@@ -75,15 +75,14 @@ fn setup(app: &mut App) -> Result<(), Box<dyn Error>> {
     let open_shortcut = Shortcut::new(Some(Modifiers::CONTROL | Modifiers::ALT), Code::KeyV);
     app.handle().plugin(
         tauri_plugin_global_shortcut::Builder::new()
-            .with_handler(move |app, shortcut, _event| {
-                if shortcut == &open_shortcut {
-                    app.emit("window-shown", {})
-                        .expect("Could not emit clipboard-changed event");
+            .with_handler(move |app, shortcut, event| {
+                if shortcut == &open_shortcut && event.state == ShortcutState::Pressed  {
                     app.get_webview_window("main").map(|w| {
-                        let _ = app.cursor_position().map(|p| {w.set_position(p)});
                         w.show()?;
                         w.set_focus()
                     });
+                    app.emit("window-shown", {})
+                        .expect("Could not emit clipboard-changed event");
                 }
             })
             .build(),
@@ -103,6 +102,7 @@ pub fn run() {
                 .level(log::LevelFilter::Debug)
                 .build(),
         )
+        .plugin(tauri_plugin_macos_permissions::init())
         .plugin(tauri_plugin_clipboard_manager::init())
         .plugin(tauri_plugin_opener::init())
         .setup(setup)

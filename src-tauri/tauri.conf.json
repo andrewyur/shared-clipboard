@@ -1,6 +1,6 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "purple",
+  "productName": "Purple Shared Clipboard",
   "version": "0.1.0",
   "identifier": "com.purple.clip",
   "build": {
@@ -12,7 +12,7 @@
   "app": {
     "windows": [
       {
-        "title": "purple",
+        "title": "Purple Shared Clipboard",
         "width": 300,
         "height": 330,
         "resizable": false,

@@ -16,6 +16,6 @@
     "global-shortcut:default",
     "os:default",
     "store:default",
-    "store:default"
+    "macos-permissions:default"
   ]
 }
