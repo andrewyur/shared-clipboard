@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::{path::PathBuf, time::Duration};
 use std::ptr::copy_nonoverlapping;
 use crate::clipboard_files::ClipboardError;
 use windows::Win32::{
@@ -29,8 +29,17 @@ struct ClipboardGuard;
 
 impl ClipboardGuard {
     pub fn open() -> Result<Self, ClipboardError> {
-        unsafe { OpenClipboard(Some(HWND(std::ptr::null_mut()))) }?;
-        Ok(Self)
+        let mut delay = Duration::from_millis(5);
+        for _ in 0..10 {
+            unsafe {
+                if OpenClipboard(Some(HWND(std::ptr::null_mut()))).is_ok() {
+                    return Ok(Self);
+                }
+            }
+            std::thread::sleep(delay);
+            delay = delay.saturating_mul(2);
+        }
+        Err(ClipboardError::OpenError)
     }
 }
 

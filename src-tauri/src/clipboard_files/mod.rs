@@ -33,4 +33,6 @@ pub enum ClipboardError {
     NoFiles,
     #[error("The system returned an error: {0}")]
     SystemError(String),
+    #[error("Could not open the clipboard")]
+    OpenError,
 }

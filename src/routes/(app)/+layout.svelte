@@ -13,9 +13,13 @@
     
     const { children } = $props()
 
-    function hideWindow() {
-        getCurrentWindow().hide();
-    }
+    const hideWindow = () => invoke("hide_window")
+
+    listen<string>("key", ({ payload }) => {
+        if(payload === "Enter") {
+            (document.activeElement as HTMLButtonElement | HTMLElement)?.click()
+        }
+    })
 
     type Tab = {
         label: string,
@@ -48,34 +52,22 @@
 
     const tabIndex = $derived(tabs.findIndex((t) => t.path === page.url.pathname));
 
-    function handleKeydown(e: KeyboardEvent) {
-        if(e.key === "ArrowLeft") {
-            goto(tabs[Math.max(tabIndex - 1, 0)].path)
-        }
-        if(e.key === "ArrowRight") {
-            goto(tabs[Math.min(tabIndex + 1, tabs.length - 1)].path)
-        }
-        if(e.key === "Escape") {
-            hideWindow()
-        }
-    }
-
-    function handleBlur() {
-        console.log("blurred")
-        setTimeout(() => {
-            if(!document.hasFocus()) {
-                hideWindow()
-            }
-        }, 100)
-    }
-    
     onMount(() => {
         tick().then(() => {
             OverlayScrollbars(document.querySelector('main') as HTMLElement, {});
         })
 
-        document.addEventListener("keydown", handleKeydown)
-        window.addEventListener("blur", handleBlur)
+        const unlistenKey = listen<string>("key", ({ payload }) => {
+            if(payload === "LeftArrow") {
+                goto(tabs[Math.max(tabIndex - 1, 0)].path)
+            }
+            if(payload === "RightArrow") {
+                goto(tabs[Math.min(tabIndex + 1, tabs.length - 1)].path)
+            }
+            if(payload === "Escape") {
+                hideWindow()
+            }
+        });
 
         const unlistenWindowShown = listen("window-shown", () => {
             invoke("request_update");
@@ -83,11 +75,10 @@
         });
         
         invoke("request_update");
-
+        
         return async () => {
-            (await unlistenWindowShown)()
-            document.removeEventListener("keydown", handleKeydown)
-            window.removeEventListener("blur", handleBlur)
+            (await unlistenKey)();
+            (await unlistenWindowShown)();
         }
     })
 </script>

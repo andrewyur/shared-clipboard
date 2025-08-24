@@ -32,7 +32,7 @@ impl ManagedItem {
         }
     }
 }
-pub struct Manager {
+pub struct ClipboardManager {
     store: HashMap<u32, ManagedItem>,
     history: VecDeque<u32>,
     pinned: Vec<u32>,
@@ -40,9 +40,12 @@ pub struct Manager {
     app: AppHandle,
 }
 
-impl Manager {
-    pub fn new(app: AppHandle) -> Self {
+impl ClipboardManager {
+    pub fn new(app_handle: &AppHandle) -> Self {
         log::info!("created clipboard manager");
+
+        let app = app_handle.clone();
+
         let mut store = HashMap::new();
         let mut history = VecDeque::with_capacity(HISTORY_LEN);
 

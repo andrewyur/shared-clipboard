@@ -1,8 +1,10 @@
 <script lang="ts">
-    import { getCurrentWindow } from '@tauri-apps/api/window';
     import { mdiClose } from '@mdi/js';
     import "@jamescoyle/svg-icon"
     import { platform } from "@tauri-apps/plugin-os"
+    import { invoke } from '@tauri-apps/api/core';
+    import { onMount } from 'svelte';
+    import { listen } from '@tauri-apps/api/event';
     
     if (platform() === 'macos') {
         document.body.classList.add("macos")
@@ -10,9 +12,7 @@
 
     const { children } = $props()
 
-    function hideWindow() {
-        getCurrentWindow().hide();
-    }
+    const hideWindow = () => invoke("hide_window")
 </script>
 
 <div id="titleBar" data-tauri-drag-region>

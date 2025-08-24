@@ -4,21 +4,21 @@ use std::sync::Mutex;
 use clipboard_master::{CallbackResult, ClipboardHandler};
 use tauri::{AppHandle, Manager as TauriManager};
 
-use crate::manager::Manager;
+use crate::clipboard_manager::ClipboardManager;
 
 pub struct Watcher {
     handle: AppHandle,
 }
 
 impl Watcher {
-    pub fn new(handle: AppHandle) -> Self {
-        Self { handle }
+    pub fn new(app: &AppHandle) -> Self {
+        Self { handle: app.clone() }
     }
 }
 
 impl ClipboardHandler for Watcher {
     fn on_clipboard_change(&mut self) -> CallbackResult {
-        let state = self.handle.state::<Mutex<Option<Manager>>>();
+        let state = self.handle.state::<Mutex<Option<ClipboardManager>>>();
         match state.lock() {
             Ok(mut manager) => {
                 manager.as_mut().map(|m| m.check());

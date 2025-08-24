@@ -13,27 +13,25 @@ export function useSelect(list: unknown[]) {
         refs[index] = element
     } 
 
-    function handleKeydown(e: KeyboardEvent) {
-        if (e.key === "ArrowUp") {
+    function handleKeydown(key: string) {
+        if (key === "UpArrow") {
             if (selected == 0) {
                 selected = list.length - 1;
             } else {
                 selected -= 1;
             }
-            e.preventDefault();
         }
-        if (e.key === "ArrowDown") {
+        if (key === "DownArrow") {
             if (selected == list.length - 1) {
                 selected = 0;
             } else {
                 selected += 1;
             }
-            e.preventDefault();
         }
     }
 
     const selectAttachment: Attachment = (element) => {
-        document.addEventListener("keydown", handleKeydown);
+        const unlistenKey = listen<string>("key", ({ payload }) => handleKeydown(payload))
         const unlistenWindowShown = listen("window-shown", () => {
             if( selected == 0 ) {
                 update += 1;
@@ -41,9 +39,10 @@ export function useSelect(list: unknown[]) {
                 selected = 0
             }
         },);
+        refs[selected]?.focus()
         return async () => {
-            (await unlistenWindowShown)()
-            document.removeEventListener("keydown", handleKeydown);
+            (await unlistenWindowShown)();
+            (await unlistenKey)();
         }
     }
 

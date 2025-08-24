@@ -22,6 +22,7 @@
         "maximizable": false,
         "minimizable": false,
         "decorations": false,
+        "focusable": false,
         "windowEffects": {
           "effects": ["popover", "mica"],
           "radius": 9,

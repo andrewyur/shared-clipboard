@@ -1,10 +1,9 @@
 <script lang="ts">
     import { invoke } from "@tauri-apps/api/core";
     import type { ItemData } from "./State.svelte";
-    import { getCurrentWindow } from "@tauri-apps/api/window";
     import { onMount } from "svelte";
     import "@jamescoyle/svg-icon"
-    import { mdiPin, mdiPinOutline } from "@mdi/js"
+    import { mdiPinOff, mdiPinOutline } from "@mdi/js"
 
     const {
         itemData,
@@ -18,8 +17,8 @@
         register: (i: number, e: HTMLButtonElement) => void
     } = $props();
 
-    const copyItem = () => invoke("copy_item", { id: itemData.id });
-    const hideWindow = () => getCurrentWindow().hide()
+    const copyItem = () => invoke("paste_item", { id: itemData.id });
+    const hideWindow = () => invoke("hide_window")
 
     let hovered = $state(false)
 
@@ -75,7 +74,7 @@
     
     {#if itemData.is_pinned}
     <button class="action" aria-label="unpin the item" onclick={unpin}>
-        <svg-icon type="mdi" size="15" path={mdiPin}></svg-icon>
+        <svg-icon type="mdi" size="15" path={mdiPinOff}></svg-icon>
     </button>
     {:else}
     <button class="action" aria-label="pin the item" onclick={pin}>
