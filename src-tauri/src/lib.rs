@@ -66,6 +66,7 @@ fn setup(app: &mut App) -> Result<(), Box<dyn Error>> {
     #[cfg(not(target_os = "macos"))]
     {
         window.set_skip_taskbar(true)?;
+        window.set_always_on_top(true)?;
         window.set_decorations(false)?;
     }
 
@@ -92,6 +93,7 @@ fn setup(app: &mut App) -> Result<(), Box<dyn Error>> {
                     position_window::position_window(&window);
                     // sleep to let window position call be registered before window shown, so they happen in order
                     // i know this is bad, not sure how else to do it though, tokio fails for some reason
+                    #[cfg(target_os = "macos")]
                     std::thread::sleep(std::time::Duration::from_millis(16));
                     show(&app);
                     app.emit("window-shown", {})

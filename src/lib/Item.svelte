@@ -138,10 +138,6 @@
         outline-color: rgba(0, 0, 0, 1);
     }
 
-    body:not(.macos) .hover > .item {
-        box-shadow: 0px 0px 5px 2px rgb(215, 215, 215) ;
-    }
-
     p {
         margin: 0;
         font-size: small;
