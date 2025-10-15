@@ -5,6 +5,9 @@
     import { checkAccessibilityPermission, checkInputMonitoringPermission, requestAccessibilityPermission, requestInputMonitoringPermission } from "tauri-plugin-macos-permissions-api";
 
     let input = $state(false)
+    let accessibility = $state(false)
+
+    let permissions = $derived(input && accessibility)
 
     $effect(() => {
         if (input) {
@@ -16,12 +19,15 @@
     async function checkInput() {
         input = await checkInputMonitoringPermission() 
     }
-
-    checkInput()
+    async function checkAccessibility() {
+        accessibility = await checkAccessibilityPermission() 
+    }
 
     function handleFocus() {
         checkInput()
+        checkAccessibility()
     }
+    handleFocus()
 
     onMount(() => {
         window.addEventListener("focus", handleFocus)
@@ -33,6 +39,14 @@
 
 <p class="header">This app needs the following permissions to function:</p>
 <div class="container">
+    {#if !accessibility}
+    <div class="subcontainer">
+        <button onclick={requestAccessibilityPermission}>Accessibility</button>
+    </div>
+    {:else}
+        <svg-icon type="mdi" path={mdiCheck}></svg-icon>
+    {/if}
+
     {#if !input}
     <div class="subcontainer">
         <button onclick={requestInputMonitoringPermission}>Input Monitoring</button>

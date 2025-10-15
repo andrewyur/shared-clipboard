@@ -1,13 +1,13 @@
 import { redirect } from '@sveltejs/kit';
 import { platform } from '@tauri-apps/plugin-os';
-import { checkInputMonitoringPermission } from 'tauri-plugin-macos-permissions-api';
+import { checkAccessibilityPermission, checkInputMonitoringPermission } from 'tauri-plugin-macos-permissions-api';
 
 export async function load() {
   if (platform() !== "macos") {
     throw redirect(302, '/history');
   }
 
-  const permissions = await Promise.all([ checkInputMonitoringPermission()]) 
+  const permissions = await Promise.all([ checkInputMonitoringPermission(), checkAccessibilityPermission()]) 
   if( permissions.every(p => p) ) {
     throw redirect(302, '/history');
   } else {

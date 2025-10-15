@@ -18,7 +18,3 @@ body {
   display: flex;
   flex-direction: column;
 }
-
-.macos {
-  border-radius: 12px;
-}

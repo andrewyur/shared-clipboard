@@ -64,9 +64,19 @@ pub async fn show_window(app: AppHandle) {
 
 pub fn show(app: &AppHandle) {
     let window = app.get_webview_window("main").unwrap();
-    let state = app.state::<HookManager>();
-    state.install();
-    let _ = window.show();
+    let hook_manager = app.state::<Mutex<HookManager>>();
+    _ = hook_manager.lock().as_mut().map(|h| h.install());
+    _ = window.show();
+
+    #[cfg(target_os = "macos")]
+    {
+        use objc2_app_kit::{NSWindow};
+        let ns_window_ptr = window.ns_window().unwrap();
+        unsafe {
+            let ns_window = &mut *(ns_window_ptr as *mut NSWindow);
+            ns_window.orderFrontRegardless();
+        }
+    }
 }
 
 #[tauri::command]
@@ -76,7 +86,7 @@ pub async fn hide_window(app: AppHandle) {
 
 pub fn hide(app: &AppHandle) {
     let window = app.get_webview_window("main").unwrap();
-    let state = app.state::<HookManager>();
-    state.uninstall();
-    let _ = window.hide();
+    let hook_manager = app.state::<Mutex<HookManager>>();
+    _ = hook_manager.lock().as_mut().map(|h| h.uninstall());
+    _ = window.hide();
 }

@@ -5,8 +5,6 @@ export function useSelect(list: unknown[]) {
     let selected = $state(0)
     let update = $state(0)
 
-    $inspect(selected)
-
     const refs: HTMLButtonElement[] = []
 
     function register(index: number, element: HTMLButtonElement) {

@@ -25,51 +25,52 @@ fn setup(app: &mut App) -> Result<(), Box<dyn Error>> {
 
     #[cfg(target_os = "macos")]
     {
-        // app.set_dock_visibility(false);
+        app.set_dock_visibility(false);
+        app.set_activation_policy(tauri::ActivationPolicy::Accessory);
+        window.set_visible_on_all_workspaces(true)?;
 
-        // app.set_activation_policy accessory
-        // window set_visible_on_all_workspaces(
+        use objc2_app_kit::{
+            NSWindow, NSWindowButton, NSWindowCollectionBehavior, NSWindowStyleMask,
+        };
 
-        // refocus app when workspace is switched to the window's active workspace, dock visibility
-        use block2::RcBlock;
-        use objc2_app_kit::{NSWindow, NSWindowCollectionBehavior, NSWorkspace};
-        use objc2_foundation::{NSNotification, NSNotificationName, NSOperationQueue};
-
-        let apphandle = app.handle().clone();
-        let name = NSNotificationName::from_str("NSWorkspaceActiveSpaceDidChangeNotification");
-        let block = RcBlock::new(move |_notifcation: std::ptr::NonNull<NSNotification>| {
-            apphandle.get_webview_window("main").map(|w| {
-                let ns_window_ptr = w.ns_window().unwrap();
-                let ns_window = unsafe { &mut *(ns_window_ptr as *mut NSWindow) };
-                if unsafe { ns_window.isOnActiveSpace() } {
-                    let _ = w.set_focus();
-                }
-            });
-        });
-        unsafe {
-            let center = NSWorkspace::sharedWorkspace().notificationCenter();
-            let queue = NSOperationQueue::mainQueue();
-            center.addObserverForName_object_queue_usingBlock(
-                Some(&name),
-                None,
-                Some(&queue),
-                &*block,
-            );
-        }
-
-        // set window to move into active workspace when shown
         let ns_window_ptr = window.ns_window().unwrap();
         unsafe {
             let ns_window = &mut *(ns_window_ptr as *mut NSWindow);
-            ns_window.setCollectionBehavior(NSWindowCollectionBehavior::MoveToActiveSpace);
+            ns_window.setCollectionBehavior(
+                NSWindowCollectionBehavior::CanJoinAllSpaces
+                    | NSWindowCollectionBehavior::Stationary
+                    | NSWindowCollectionBehavior::FullScreenAuxiliary,
+            );
+
+            let mut mask = ns_window.styleMask();
+            mask.insert(NSWindowStyleMask::FullSizeContentView);
+            ns_window.setStyleMask(mask);
+
+            ns_window.setTitlebarAppearsTransparent(true);
+
+            ns_window
+                .standardWindowButton(NSWindowButton::CloseButton)
+                .map(|b| b.setHidden(true));
+            ns_window
+                .standardWindowButton(NSWindowButton::MiniaturizeButton)
+                .map(|b| b.setHidden(true));
+            ns_window
+                .standardWindowButton(NSWindowButton::ZoomButton)
+                .map(|b| b.setHidden(true));
         }
+
+        app.handle()
+            .plugin(tauri_plugin_macos_permissions::init())?;
     }
 
     #[cfg(not(target_os = "macos"))]
-    let _ = window.set_skip_taskbar(true);
+    {
+        window.set_skip_taskbar(true)?;
+        window.set_decorations(false)?;
+    }
 
     app.manage(Mutex::new(Some(ClipboardManager::new(app.handle()))));
-    app.manage(HookManager::new(app.handle()));
+    app.manage(Mutex::new(HookManager::new(app.handle())));
 
     // start clipboard change watcher
     let mut watcher = Master::new(Watcher::new(app.handle()));
@@ -89,7 +90,10 @@ fn setup(app: &mut App) -> Result<(), Box<dyn Error>> {
                 if shortcut == &open_shortcut && event.state == ShortcutState::Pressed {
                     let window = app.get_webview_window("main").unwrap();
                     position_window::position_window(&window);
-                    show(app);
+                    // sleep to let window position call be registered before window shown, so they happen in order
+                    // i know this is bad, not sure how else to do it though, tokio fails for some reason
+                    std::thread::sleep(std::time::Duration::from_millis(16));
+                    show(&app);
                     app.emit("window-shown", {})
                         .expect("Could not emit clipboard-changed event");
                 }
@@ -99,15 +103,12 @@ fn setup(app: &mut App) -> Result<(), Box<dyn Error>> {
 
     app.global_shortcut().register(open_shortcut)?;
 
-    // app is shown on startup
-    let keyboard_hook_manager = app.state::<HookManager>();
-    keyboard_hook_manager.install();
+    show(app.handle());
     Ok(())
 }
 
-#[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    let app = tauri::Builder::default()
+    tauri::Builder::default()
         .plugin(tauri_plugin_store::Builder::new().build())
         .plugin(tauri_plugin_os::init())
         .plugin(
@@ -116,14 +117,8 @@ pub fn run() {
                 .build(),
         )
         .plugin(tauri_plugin_clipboard_manager::init())
-        .plugin(tauri_plugin_opener::init());
-
-    #[cfg(target_os = "macos")]
-    {
-        app.plugin(tauri_plugin_macos_permissions::init())
-    }
-
-    app.setup(setup)
+        .plugin(tauri_plugin_opener::init())
+        .setup(setup)
         .invoke_handler(tauri::generate_handler![
             paste_item,
             pin_item,

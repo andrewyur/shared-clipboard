@@ -26,7 +26,6 @@ export const state = $state<UpdateMessage>({
 
 
 listen<UpdateMessage>("update", (e) => { 
-    console.log(e.payload)
     state.pinned.splice(0, state.pinned.length, ...e.payload.pinned)
     state.history.splice(0, state.history.length, ...e.payload.history)
 });

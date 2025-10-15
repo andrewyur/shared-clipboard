@@ -6,7 +6,7 @@ use std::path::PathBuf;
 use std::str::FromStr;
 
 pub(crate) fn read_clipboard() -> Result<Vec<PathBuf>, ClipboardError> {
-    let pasteboard = unsafe { NSPasteboard::generalPasteboard() };
+    let pasteboard = NSPasteboard::generalPasteboard();
 
     let val = NSNumber::numberWithBool(true);
     let options = NSDictionary::from_slices(
@@ -28,11 +28,9 @@ pub(crate) fn read_clipboard() -> Result<Vec<PathBuf>, ClipboardError> {
             .iter()
             .filter_map(|s| {
                 if let Ok(url_string) = s.downcast::<NSURL>() {
-                    unsafe {
-                        url_string
-                            .absoluteString()
-                            .map(|f| strip_prefix(PathBuf::from(f.to_string())))
-                    }
+                    url_string
+                        .absoluteString()
+                        .map(|f| strip_prefix(PathBuf::from(f.to_string())))
                 } else {
                     None
                 }
@@ -49,14 +47,12 @@ pub(crate) fn write_clipboard(paths: &Vec<PathBuf>) -> Result<(), ClipboardError
             .collect::<Vec<_>>(),
     );
 
-    unsafe {
-        let pasteboard = NSPasteboard::generalPasteboard();
-        pasteboard.clearContents();
-        if !pasteboard.writeObjects(&*nsurl_array) {
-            return Err(ClipboardError::SystemError(
-                "Could not write to system clipboard!".into(),
-            ));
-        }
+    let pasteboard = NSPasteboard::generalPasteboard();
+    pasteboard.clearContents();
+    if !pasteboard.writeObjects(&*nsurl_array) {
+        return Err(ClipboardError::SystemError(
+            "Could not write to system clipboard!".into(),
+        ));
     }
 
     Ok(())

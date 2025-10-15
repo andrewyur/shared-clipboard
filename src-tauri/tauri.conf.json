@@ -17,11 +17,10 @@
         "height": 330,
         "resizable": false,
         "hiddenTitle": true,
-        "alwaysOnTop": true,
         "transparent": true,
         "maximizable": false,
         "minimizable": false,
-        "decorations": false,
+        "focus": false,
         "focusable": false,
         "windowEffects": {
           "effects": ["popover", "mica"],

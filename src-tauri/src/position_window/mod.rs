@@ -1,43 +1,80 @@
-use anyhow::Context;
-use tauri::{PhysicalPosition, PhysicalRect, WebviewWindow};
+use anyhow::{anyhow, Context};
+use tauri::{Manager, PhysicalPosition, PhysicalRect, PhysicalSize, WebviewWindow};
 
 #[cfg(target_os = "windows")]
 mod windows;
 #[cfg(target_os = "windows")]
 use crate::position_window::windows::get_caret;
 
+#[cfg(target_os = "macos")]
+mod macos;
+#[cfg(target_os = "macos")]
+use crate::position_window::macos::get_caret;
+
 pub fn position_window(window: &WebviewWindow) {
-    if let Err(e) = _position_window(window) {
-        log::warn!("Was not able to position window at cursor: {:#}", e);
-        let _ = window.center();
-    }
+    if let Err(e) = try_position_window(window) {
+        log::warn!("Was not able to position window at caret: {:#}", e);
+
+        if let Ok(cursor_position) = get_cursor_position(window) {
+            _ = window.set_position(cursor_position);
+        }
+    } 
 }
 
-fn _position_window(window: &WebviewWindow) -> anyhow::Result<()>{ 
-    let caret = get_caret().with_context(|| "Could not get caret position")?;
+fn get_cursor_position(window: &WebviewWindow) -> anyhow::Result<PhysicalPosition<i32>> {
+    let cursor_position = window.app_handle().cursor_position()?;
+    let monitor = get_monitor_for_point(window, cursor_position.cast())?;
+    let window_size = window.outer_size().unwrap();
+
+    clamp_position_to_monitor(cursor_position.x as i32, cursor_position.y as i32, window_size, &monitor)
+}
+
+fn try_position_window(window: &WebviewWindow) -> anyhow::Result<()> {
+    let caret = get_caret().context("Could not get caret position")?;
     if caret.position.x == 0 && caret.position.y == 0 {
-        return Err(anyhow::anyhow!("Caret is not visible"))
+        return Err(anyhow!("Caret is not visible"));
     }
+
     let window_position = calculate_window_position(caret, window)?;
-    window.set_position(window_position).with_context(|| "could not set window position")
+    window.set_position(window_position).context("Could not set window position")?;
+
+    Ok(())
 }
 
 fn calculate_window_position(caret: PhysicalRect<i32, u32>, window: &WebviewWindow) -> anyhow::Result<PhysicalPosition<i32>> {
-    let monitor = window.monitor_from_point(caret.position.x as f64, caret.position.y as f64)
-        .with_context(|| format!("could not get window monitor from point: {:?}, {:?}", caret.position.x, caret.position.y))?
-        .ok_or_else(|| anyhow::anyhow!("could not get monitor from point: {:?}, {:?}", caret.position.x, caret.position.y))?;
+    let monitor = get_monitor_for_point(window, caret.position)?;
     let window_size = window.outer_size().unwrap();
 
-    let mut y = caret.position.y;
-    let mut x = caret.position.x;
+    let x = caret.position.x;
+    let mut y = caret.position.y + caret.size.height as i32;
 
     if y + window_size.height as i32 > monitor.size().height as i32 {
-        y -= (window_size.height + caret.size.height) as i32
+        y = caret.position.y - window_size.height as i32;
     }
 
-    if x + window_size.width as i32 > monitor.size().width as i32 {
-        x = (monitor.size().width - window_size.width) as i32
+    clamp_position_to_monitor(x, y, window_size, &monitor)
+}
+
+fn get_monitor_for_point(window: &WebviewWindow, point: PhysicalPosition<i32>) -> anyhow::Result<tauri::Monitor> {
+    window
+        .monitor_from_point(point.x as f64, point.y as f64)
+        .with_context(|| format!("Could not get monitor for point {:?}", point))?
+        .ok_or_else(|| anyhow!("Could not get monitor for point {:?}", point))
+}
+
+fn clamp_position_to_monitor(
+    mut x: i32,
+    mut y: i32,
+    window_size: PhysicalSize<u32>,
+    monitor: &tauri::Monitor,
+) -> anyhow::Result<PhysicalPosition<i32>> {
+    let monitor_size = monitor.size();
+    if x + window_size.width as i32 > monitor_size.width as i32 {
+        x = monitor_size.width as i32 - window_size.width as i32;
+    }
+    if y + window_size.height as i32 > monitor_size.height as i32 {
+        y = monitor_size.height as i32 - window_size.height as i32;
     }
 
-    Ok(PhysicalPosition { x: x - caret.size.width as i32 , y: y + caret.size.height as i32 })
+    Ok(PhysicalPosition { x: x.max(0), y: y.max(0) })
 }

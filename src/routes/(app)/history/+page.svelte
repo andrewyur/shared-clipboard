@@ -17,7 +17,7 @@
     <p style="font-style: italic; opacity: 0.5;">No Clipboard History yet...</p>
   {:else}
     {#each state.history as item, i (item.id)}
-      <Item itemData={item} index={i} {register} />
+      <Item itemData={item} index={i} {register} current={i === 0} />
     {/each}
   {/if}
 </div>

@@ -3,8 +3,6 @@
     import "@jamescoyle/svg-icon"
     import { platform } from "@tauri-apps/plugin-os"
     import { invoke } from '@tauri-apps/api/core';
-    import { onMount } from 'svelte';
-    import { listen } from '@tauri-apps/api/event';
     
     if (platform() === 'macos') {
         document.body.classList.add("macos")
@@ -20,7 +18,7 @@
         <svg-icon class="cross" type="mdi" path={mdiClose} size="20"></svg-icon>
     </button>
 </div>
-{@render children() }
+{@render children()}
 
 <style>
     svg-icon {

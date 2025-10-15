@@ -21,6 +21,7 @@
     const hideWindow = () => invoke("hide_window")
 
     let hovered = $state(false)
+    let focused = $state(false)
 
     let itemRef: HTMLButtonElement;
 
@@ -39,12 +40,17 @@
     })
 
     function handleFocus(e: FocusEvent) {
+        focused = true
         requestAnimationFrame(() => {
             itemRef?.scrollIntoView({
                 behavior: "smooth",
                 block: "center",
             });
         });
+    }
+
+    function handleFocusOut() {
+        focused = false
     }
 </script>
 
@@ -60,6 +66,8 @@
         tabindex={index + 1}
         bind:this={itemRef}
         onfocus={handleFocus}
+        onfocusout={handleFocusOut}
+        class:focused={focused}
     >
         {#if itemData.contents.kind === "text"}
             <p>{itemData.contents.content}</p>
@@ -126,11 +134,11 @@
         background-color: rgb(238, 238, 238)
     }
 
-    .item:focus {
+    .focused {
         outline-color: rgba(0, 0, 0, 1);
     }
 
-    .hover > .item {
+    body:not(.macos) .hover > .item {
         box-shadow: 0px 0px 5px 2px rgb(215, 215, 215) ;
     }
 
