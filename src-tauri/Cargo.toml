@@ -1,6 +1,6 @@
 [package]
 name = "purple"
-version = "0.1.0"
+version = "0.1.1"
 description = "Clipboard Manager that can share across local networks"
 authors = ["Andrew Yurovchak"]
 edition = "2021"
