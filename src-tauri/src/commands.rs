@@ -2,7 +2,10 @@ use std::sync::Mutex;
 
 use tauri::{AppHandle, Manager as TauriManager};
 
-use crate::{hook_manager::{send_ctrl_v, HookManager}, clipboard_manager::ClipboardManager};
+use crate::{
+    clipboard_manager::ClipboardManager,
+    hook_manager::{send_ctrl_v, HookManager},
+};
 
 #[tauri::command]
 pub async fn paste_item(
@@ -10,7 +13,10 @@ pub async fn paste_item(
     state: tauri::State<'_, Mutex<Option<ClipboardManager>>>,
     id: u32,
 ) -> Result<(), String> {
-    log::info!("copying item with id {} from history to clipboard and pasting", id);
+    log::info!(
+        "copying item with id {} from history to clipboard and pasting",
+        id
+    );
     let mut clip = state
         .lock()
         .map_err(|e| format!("Could not access the clipboard handler {}", e))?;
@@ -21,7 +27,9 @@ pub async fn paste_item(
 }
 
 #[tauri::command]
-pub async fn request_update(state: tauri::State<'_, Mutex<Option<ClipboardManager>>>) -> Result<(), String> {
+pub async fn request_update(
+    state: tauri::State<'_, Mutex<Option<ClipboardManager>>>,
+) -> Result<(), String> {
     let clip = state
         .lock()
         .map_err(|e| format!("Could not access the clipboard handler {}", e))?;
@@ -55,7 +63,6 @@ pub async fn unpin_item(
     Ok(())
 }
 
-
 // want to listen to show and hide window events: https://github.com/tauri-apps/tauri/issues/14061
 #[tauri::command]
 pub async fn show_window(app: AppHandle) {
@@ -70,7 +77,7 @@ pub fn show(app: &AppHandle) {
 
     #[cfg(target_os = "macos")]
     {
-        use objc2_app_kit::{NSWindow};
+        use objc2_app_kit::NSWindow;
         let ns_window_ptr = window.ns_window().unwrap();
         unsafe {
             let ns_window = &mut *(ns_window_ptr as *mut NSWindow);

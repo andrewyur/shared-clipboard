@@ -5,7 +5,9 @@
   "windows": [
     "main"
   ],
-  "platforms": ["macOS"],
+  "platforms": [
+    "macOS"
+  ],
   "permissions": [
     "core:default",
     "opener:default",
@@ -17,6 +19,9 @@
     "global-shortcut:default",
     "os:default",
     "store:default",
-    "macos-permissions:default"
+    "macos-permissions:default",
+    "autostart:default",
+    "autostart:allow-enable",
+    "updater:default"
   ]
 }

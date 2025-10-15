@@ -38,16 +38,16 @@
             path: "/pinned",
             icon: mdiPin
         },
-        {
-            label: "other devices",
-            path: "/devices",
-            icon: mdiMonitorMultiple
-        }, 
-        {
-            label: "settings",
-            path: "/settings",
-            icon: mdiCog
-        }
+        // {
+        //     label: "other devices",
+        //     path: "/devices",
+        //     icon: mdiMonitorMultiple
+        // }, 
+        // {
+        //     label: "settings",
+        //     path: "/settings",
+        //     icon: mdiCog
+        // }
     ]
 
     const tabIndex = $derived(tabs.findIndex((t) => t.path === page.url.pathname));

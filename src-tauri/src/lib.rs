@@ -11,12 +11,32 @@ use std::sync::Mutex;
 
 use clipboard_master::Master;
 use tauri::{App, Emitter, Manager as TauriManager};
+use tauri_plugin_autostart::ManagerExt;
 use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Modifiers, Shortcut, ShortcutState};
+use tauri_plugin_updater::UpdaterExt;
 
 use crate::clipboard_manager::ClipboardManager;
 use crate::commands::*;
 use crate::hook_manager::HookManager;
 use crate::watcher::Watcher;
+
+async fn update(app: tauri::AppHandle) -> tauri_plugin_updater::Result<()> {
+  if let Some(update) = app.updater()?.check().await? {
+    update
+      .download_and_install(
+        |_chunk_length, _content_length| {},
+        || {
+          log::info!("download finished");
+        },
+      )
+      .await?;
+
+    log::info!("Update installed, restarting");
+    app.restart();
+  }
+
+  Ok(())
+}
 
 fn setup(app: &mut App) -> Result<(), Box<dyn Error>> {
     let window = app
@@ -70,6 +90,18 @@ fn setup(app: &mut App) -> Result<(), Box<dyn Error>> {
         window.set_decorations(false)?;
     }
 
+    let autostart_manager = app.autolaunch();
+    if !cfg!(dev) {
+        let _ = autostart_manager
+            .enable()
+            .map_err(|e| log::warn!("Could not enable autostart: {:#}", e));
+
+        let handle = app.handle().clone();
+        tauri::async_runtime::spawn(async move {
+            _ = update(handle).await.map_err(|e| log::error!("Could not install update: {:#}", e));
+        });
+    }
+
     app.manage(Mutex::new(Some(ClipboardManager::new(app.handle()))));
     app.manage(Mutex::new(HookManager::new(app.handle())));
 
@@ -84,7 +116,10 @@ fn setup(app: &mut App) -> Result<(), Box<dyn Error>> {
     });
 
     // register global shortcut
-    let open_shortcut = Shortcut::new(Some(Modifiers::CONTROL | Modifiers::ALT), Code::KeyV);
+    let open_shortcut = Shortcut::new(
+        Some(Modifiers::CONTROL | Modifiers::ALT),
+        if cfg!(dev) { Code::KeyB } else { Code::KeyV },
+    );
     app.handle().plugin(
         tauri_plugin_global_shortcut::Builder::new()
             .with_handler(move |app, shortcut, event| {
@@ -111,6 +146,8 @@ fn setup(app: &mut App) -> Result<(), Box<dyn Error>> {
 
 pub fn run() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_updater::Builder::new().build())
+        .plugin(tauri_plugin_autostart::Builder::new().build())
         .plugin(tauri_plugin_store::Builder::new().build())
         .plugin(tauri_plugin_os::init())
         .plugin(

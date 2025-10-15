@@ -16,8 +16,10 @@
     "@jamescoyle/svg-icon": "^1.0.0",
     "@mdi/js": "^7.4.47",
     "@tauri-apps/api": "^2",
+    "@tauri-apps/plugin-autostart": "^2.5.0",
     "@tauri-apps/plugin-opener": "^2",
     "@tauri-apps/plugin-os": "^2.3.0",
+    "@tauri-apps/plugin-updater": "^2.9.0",
     "overlayscrollbars": "^2.11.5",
     "overlayscrollbars-svelte": "^0.5.5",
     "tauri-plugin-macos-permissions-api": "^2.3.0"

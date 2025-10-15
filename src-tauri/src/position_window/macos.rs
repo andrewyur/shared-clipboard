@@ -1,6 +1,7 @@
 use anyhow::anyhow;
 use objc2_application_services::{
-    kAXTrustedCheckOptionPrompt, AXError, AXIsProcessTrustedWithOptions, AXUIElement, AXValue, AXValueType,
+    kAXTrustedCheckOptionPrompt, AXError, AXIsProcessTrustedWithOptions, AXUIElement, AXValue,
+    AXValueType,
 };
 use objc2_core_foundation::{CFBoolean, CFDictionary, CFRange, CFType, CGRect};
 use objc2_foundation::NSString;
@@ -30,12 +31,15 @@ pub fn get_caret() -> anyhow::Result<PhysicalRect<i32, u32>> {
             NonNull::new(&mut focused_element).unwrap(),
         )
     };
-        
+
     if ax_error != AXError::Success {
         if ax_error == AXError::NoValue {
-            return Err(anyhow!("No currently focused UI Element"))
+            return Err(anyhow!("No currently focused UI Element"));
         } else {
-            return Err(anyhow!("Could not fetch currently focused UI Element: {:?}", ax_error))
+            return Err(anyhow!(
+                "Could not fetch currently focused UI Element: {:?}",
+                ax_error
+            ));
         }
     }
 
@@ -51,9 +55,12 @@ pub fn get_caret() -> anyhow::Result<PhysicalRect<i32, u32>> {
 
     if ax_error != AXError::Success {
         if ax_error == AXError::NoValue {
-            return Err(anyhow!("No currently selected text range"))
+            return Err(anyhow!("No currently selected text range"));
         } else {
-            return Err(anyhow!("Could not fetch currently selected text range: {:?}", ax_error))
+            return Err(anyhow!(
+                "Could not fetch currently selected text range: {:?}",
+                ax_error
+            ));
         }
     }
 
@@ -62,23 +69,27 @@ pub fn get_caret() -> anyhow::Result<PhysicalRect<i32, u32>> {
 
     unsafe {
         AXValue::value(
-            (selected_range_value as *const AXValue).as_ref().unwrap(), 
+            (selected_range_value as *const AXValue).as_ref().unwrap(),
             AXValueType::CFRange,
-            NonNull::new(selected_range_ptr).unwrap())
+            NonNull::new(selected_range_ptr).unwrap(),
+        )
     };
 
     let mut select_bounds = std::ptr::null();
     let ax_error = unsafe {
         AXUIElement::copy_parameterized_attribute_value(
             (focused_element as *const AXUIElement).as_ref().unwrap(),
-            NSString::from_str("AXBoundsForRange").as_ref(), 
-            selected_range_value.as_ref().unwrap(), 
-            NonNull::new(&mut select_bounds).unwrap()
+            NSString::from_str("AXBoundsForRange").as_ref(),
+            selected_range_value.as_ref().unwrap(),
+            NonNull::new(&mut select_bounds).unwrap(),
         )
     };
 
     if ax_error != AXError::Success {
-        return Err(anyhow!("Could not fetch screen bounds for text range: {:?}", ax_error));
+        return Err(anyhow!(
+            "Could not fetch screen bounds for text range: {:?}",
+            ax_error
+        ));
     }
 
     let select_rect = CGRect::default();
@@ -86,13 +97,20 @@ pub fn get_caret() -> anyhow::Result<PhysicalRect<i32, u32>> {
 
     unsafe {
         AXValue::value(
-            (select_bounds as *const AXValue).as_ref().unwrap(), 
+            (select_bounds as *const AXValue).as_ref().unwrap(),
             AXValueType::CGRect,
-            NonNull::new(select_rect_ptr).unwrap())
+            NonNull::new(select_rect_ptr).unwrap(),
+        )
     };
 
-    return Ok(PhysicalRect { 
-        position: PhysicalPosition { x: select_rect.origin.x as i32, y: (select_rect.origin.y + select_rect.size.height) as i32}, 
-        size: PhysicalSize { width: select_rect.size.width as u32, height: select_rect.size.height as u32 }
-    })
+    return Ok(PhysicalRect {
+        position: PhysicalPosition {
+            x: select_rect.origin.x as i32,
+            y: (select_rect.origin.y + select_rect.size.height) as i32,
+        },
+        size: PhysicalSize {
+            width: select_rect.size.width as u32,
+            height: select_rect.size.height as u32,
+        },
+    });
 }

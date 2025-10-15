@@ -1,15 +1,14 @@
 use tauri::{AppHandle, Emitter};
 
-
 #[cfg(target_os = "windows")]
 mod windows;
 #[cfg(target_os = "windows")]
-pub use windows::{HookManager, send_ctrl_v};
+pub use windows::{send_ctrl_v, HookManager};
 
 #[cfg(target_os = "macos")]
 mod macos;
 #[cfg(target_os = "macos")]
-pub use macos::{HookManager, send_ctrl_v};
+pub use macos::{send_ctrl_v, HookManager};
 
 use crate::commands::hide;
 
@@ -21,7 +20,7 @@ enum TargetKeys {
     LeftArrow,
     RightArrow,
     Enter,
-    Other
+    Other,
 }
 
 #[allow(dead_code)]
@@ -33,5 +32,5 @@ fn handle_key(app: &AppHandle, key: TargetKeys) {
                 log::error!("could not emit key: {:#}", e);
             }
         }
-    }    
+    }
 }

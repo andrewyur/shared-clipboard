@@ -1,29 +1,26 @@
-use std::{path::PathBuf, time::Duration};
-use std::ptr::copy_nonoverlapping;
 use crate::clipboard_files::ClipboardError;
-use windows::Win32::{
-    Foundation::{GetLastError, ERROR_SUCCESS, HANDLE, HWND},
-    System::{DataExchange::{EnumClipboardFormats, GetClipboardFormatNameW}, Memory::{GlobalAlloc, GlobalLock, GlobalUnlock, GMEM_MOVEABLE}, Ole::CF_HDROP}, 
-    UI::Shell::{DragQueryFileW, DROPFILES, HDROP},
-};
+use std::ptr::copy_nonoverlapping;
+use std::{path::PathBuf, time::Duration};
+use windows::core::{Error as WinError, BOOL};
 use windows::Win32::System::DataExchange::{
-    CloseClipboard, 
-    GetClipboardData, 
-    IsClipboardFormatAvailable, 
-    OpenClipboard,
-    EmptyClipboard,
+    CloseClipboard, EmptyClipboard, GetClipboardData, IsClipboardFormatAvailable, OpenClipboard,
     SetClipboardData,
 };
-use windows::core::{Error as WinError, BOOL};
-
-
+use windows::Win32::{
+    Foundation::{GetLastError, ERROR_SUCCESS, HANDLE, HWND},
+    System::{
+        DataExchange::{EnumClipboardFormats, GetClipboardFormatNameW},
+        Memory::{GlobalAlloc, GlobalLock, GlobalUnlock, GMEM_MOVEABLE},
+        Ole::CF_HDROP,
+    },
+    UI::Shell::{DragQueryFileW, DROPFILES, HDROP},
+};
 
 impl From<WinError> for ClipboardError {
     fn from(e: WinError) -> Self {
         ClipboardError::SystemError(format!("System returned an error: {e}"))
     }
 }
-
 
 struct ClipboardGuard;
 
@@ -45,29 +42,36 @@ impl ClipboardGuard {
 
 impl Drop for ClipboardGuard {
     fn drop(&mut self) {
-        unsafe { let _ = CloseClipboard(); }
+        unsafe {
+            let _ = CloseClipboard();
+        }
     }
 }
 
 pub(crate) fn read_clipboard() -> Result<Vec<PathBuf>, ClipboardError> {
     let mut paths = Vec::new();
-    
+
     // when this is dropped, clipboard gets closed
     let _guard = ClipboardGuard::open()?;
 
-    unsafe { IsClipboardFormatAvailable(CF_HDROP.0.into()) }.map_err(|e|{
-        log::debug!(" IsClipboardFormatAvailable(CF_HDROP.0.into()) returned error: {}", e);
-        
+    unsafe { IsClipboardFormatAvailable(CF_HDROP.0.into()) }.map_err(|e| {
+        log::debug!(
+            " IsClipboardFormatAvailable(CF_HDROP.0.into()) returned error: {}",
+            e
+        );
+
         let available_format = unsafe { EnumClipboardFormats(0) };
         let mut buffer = vec![0u16; 256];
-        unsafe { GetClipboardFormatNameW(available_format, buffer.as_mut_slice()); };
-    
+        unsafe {
+            GetClipboardFormatNameW(available_format, buffer.as_mut_slice());
+        };
+
         log::info!("available format: {}", String::from_utf16_lossy(&buffer));
-        
+
         ClipboardError::NoFiles
     })?;
 
-    let hdrop_data =  unsafe { GetClipboardData(CF_HDROP.0.into()) }?;
+    let hdrop_data = unsafe { GetClipboardData(CF_HDROP.0.into()) }?;
     let hdrop = HDROP(hdrop_data.0);
     let count = unsafe { DragQueryFileW(hdrop, 0xFFFFFFFF, None) };
 
@@ -85,11 +89,11 @@ pub(crate) fn read_clipboard() -> Result<Vec<PathBuf>, ClipboardError> {
     return Ok(paths);
 }
 
-pub(crate) fn write_clipboard(paths: &Vec<PathBuf>) -> Result<(), ClipboardError>{
+pub(crate) fn write_clipboard(paths: &Vec<PathBuf>) -> Result<(), ClipboardError> {
     let mut path_buf = String::new();
 
-    paths.iter().for_each(| path| {
-        let s = path.display().to_string(); 
+    paths.iter().for_each(|path| {
+        let s = path.display().to_string();
 
         path_buf.push_str(&s);
         path_buf.push('\0');
@@ -106,17 +110,15 @@ pub(crate) fn write_clipboard(paths: &Vec<PathBuf>) -> Result<(), ClipboardError
         fNC: BOOL(0),
         fWide: BOOL(1),
     };
-    
-
 
     let h_global;
-    
-    unsafe {
-        h_global =  GlobalAlloc(GMEM_MOVEABLE, total_size)?;
-        let ptr =  GlobalLock(h_global) as *mut u8;
 
-         *(ptr as *mut DROPFILES) = dropfiles; 
-        let dest = ptr.add(dropfiles_size) as *mut u16 ;
+    unsafe {
+        h_global = GlobalAlloc(GMEM_MOVEABLE, total_size)?;
+        let ptr = GlobalLock(h_global) as *mut u8;
+
+        *(ptr as *mut DROPFILES) = dropfiles;
+        let dest = ptr.add(dropfiles_size) as *mut u16;
         copy_nonoverlapping(utf16.as_ptr(), dest, utf16.len());
 
         if !GlobalUnlock(h_global).is_ok() {
@@ -128,12 +130,11 @@ pub(crate) fn write_clipboard(paths: &Vec<PathBuf>) -> Result<(), ClipboardError
     }
 
     let _guard = ClipboardGuard::open()?;
-    
-    unsafe { 
-        EmptyClipboard()?; 
+
+    unsafe {
+        EmptyClipboard()?;
         SetClipboardData(CF_HDROP.0.into(), Some(HANDLE(h_global.0)))?;
     }
 
     Ok(())
-
 }

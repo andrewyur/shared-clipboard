@@ -18,7 +18,7 @@ pub fn position_window(window: &WebviewWindow) {
         if let Ok(cursor_position) = get_cursor_position(window) {
             _ = window.set_position(cursor_position);
         }
-    } 
+    }
 }
 
 fn get_cursor_position(window: &WebviewWindow) -> anyhow::Result<PhysicalPosition<i32>> {
@@ -26,7 +26,12 @@ fn get_cursor_position(window: &WebviewWindow) -> anyhow::Result<PhysicalPositio
     let monitor = get_monitor_for_point(window, cursor_position.cast())?;
     let window_size = window.outer_size().unwrap();
 
-    clamp_position_to_monitor(cursor_position.x as i32, cursor_position.y as i32, window_size, &monitor)
+    clamp_position_to_monitor(
+        cursor_position.x as i32,
+        cursor_position.y as i32,
+        window_size,
+        &monitor,
+    )
 }
 
 fn try_position_window(window: &WebviewWindow) -> anyhow::Result<()> {
@@ -36,12 +41,17 @@ fn try_position_window(window: &WebviewWindow) -> anyhow::Result<()> {
     }
 
     let window_position = calculate_window_position(caret, window)?;
-    window.set_position(window_position).context("Could not set window position")?;
+    window
+        .set_position(window_position)
+        .context("Could not set window position")?;
 
     Ok(())
 }
 
-fn calculate_window_position(caret: PhysicalRect<i32, u32>, window: &WebviewWindow) -> anyhow::Result<PhysicalPosition<i32>> {
+fn calculate_window_position(
+    caret: PhysicalRect<i32, u32>,
+    window: &WebviewWindow,
+) -> anyhow::Result<PhysicalPosition<i32>> {
     let monitor = get_monitor_for_point(window, caret.position)?;
     let window_size = window.outer_size().unwrap();
 
@@ -55,7 +65,10 @@ fn calculate_window_position(caret: PhysicalRect<i32, u32>, window: &WebviewWind
     clamp_position_to_monitor(x, y, window_size, &monitor)
 }
 
-fn get_monitor_for_point(window: &WebviewWindow, point: PhysicalPosition<i32>) -> anyhow::Result<tauri::Monitor> {
+fn get_monitor_for_point(
+    window: &WebviewWindow,
+    point: PhysicalPosition<i32>,
+) -> anyhow::Result<tauri::Monitor> {
     window
         .monitor_from_point(point.x as f64, point.y as f64)
         .with_context(|| format!("Could not get monitor for point {:?}", point))?
@@ -76,5 +89,8 @@ fn clamp_position_to_monitor(
         y = monitor_size.height as i32 - window_size.height as i32;
     }
 
-    Ok(PhysicalPosition { x: x.max(0), y: y.max(0) })
+    Ok(PhysicalPosition {
+        x: x.max(0),
+        y: y.max(0),
+    })
 }

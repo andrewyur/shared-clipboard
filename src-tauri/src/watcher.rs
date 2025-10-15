@@ -12,7 +12,9 @@ pub struct Watcher {
 
 impl Watcher {
     pub fn new(app: &AppHandle) -> Self {
-        Self { handle: app.clone() }
+        Self {
+            handle: app.clone(),
+        }
     }
 }
 

@@ -57,7 +57,10 @@ pub fn get_caret() -> anyhow::Result<PhysicalRect<i32, u32>> {
 
         Ok(PhysicalRect {
             position: PhysicalPosition { x: left, y: top },
-            size: PhysicalSize { width: width as u32, height: height as u32 },
+            size: PhysicalSize {
+                width: width as u32,
+                height: height as u32,
+            },
         })
     }
 }

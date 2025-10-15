@@ -4,14 +4,17 @@
 fn main() {
     #[cfg(target_os = "windows")]
     {
-        use windows::Win32::UI::HiDpi::{SetProcessDpiAwarenessContext, DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2};
+        use windows::Win32::UI::HiDpi::{
+            SetProcessDpiAwarenessContext, DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2,
+        };
         unsafe {
-            if let Err(e) = SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2) {
+            if let Err(e) =
+                SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2)
+            {
                 log::warn!("Unable to set process DPI awareness context: {}", e)
             }
         }
     }
-
 
     purple_lib::run()
 }
