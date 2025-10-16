@@ -21,21 +21,21 @@ use crate::hook_manager::HookManager;
 use crate::watcher::Watcher;
 
 async fn update(app: tauri::AppHandle) -> tauri_plugin_updater::Result<()> {
-  if let Some(update) = app.updater()?.check().await? {
-    update
-      .download_and_install(
-        |_chunk_length, _content_length| {},
-        || {
-          log::info!("download finished");
-        },
-      )
-      .await?;
+    if let Some(update) = app.updater()?.check().await? {
+        update
+            .download_and_install(
+                |_chunk_length, _content_length| {},
+                || {
+                    log::info!("download finished");
+                },
+            )
+            .await?;
 
-    log::info!("Update installed, restarting");
-    app.restart();
-  }
+        log::info!("Update installed, restarting");
+        app.restart();
+    }
 
-  Ok(())
+    Ok(())
 }
 
 fn setup(app: &mut App) -> Result<(), Box<dyn Error>> {
@@ -98,7 +98,9 @@ fn setup(app: &mut App) -> Result<(), Box<dyn Error>> {
 
         let handle = app.handle().clone();
         tauri::async_runtime::spawn(async move {
-            _ = update(handle).await.map_err(|e| log::error!("Could not install update: {:#}", e));
+            _ = update(handle)
+                .await
+                .map_err(|e| log::error!("Could not install update: {:#}", e));
         });
     }
 
@@ -146,6 +148,7 @@ fn setup(app: &mut App) -> Result<(), Box<dyn Error>> {
 
 pub fn run() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_log::Builder::new().build())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_autostart::Builder::new().build())
         .plugin(tauri_plugin_store::Builder::new().build())

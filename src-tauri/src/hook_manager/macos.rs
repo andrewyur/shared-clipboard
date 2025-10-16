@@ -78,11 +78,6 @@ struct HookManagerTemp {
 
 impl HookManagerTemp {
     fn try_new(app: &AppHandle) -> anyhow::Result<Self> {
-        let (event_tx, event_rx) = channel();
-        SENDER
-            .set(event_tx)
-            .expect("Tried to set the sender when it was already set");
-
         // need to do this bcs CGEventTap is not Send or Sync
         let (enable_tx, enable_rx) = channel();
         let (create_tx, create_rx) = channel::<Option<anyhow::Error>>();
@@ -107,6 +102,11 @@ impl HookManagerTemp {
         if let Ok(Some(e)) = create_rx.recv() {
             return Err(e);
         }
+
+        let (event_tx, event_rx) = channel();
+        SENDER
+            .set(event_tx)
+            .expect("Tried to set the sender when it was already set");
 
         let app_clone = app.clone();
         std::thread::spawn(move || event_message_handler(app_clone, event_rx));
