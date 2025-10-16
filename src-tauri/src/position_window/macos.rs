@@ -3,7 +3,7 @@ use objc2_application_services::{
     kAXTrustedCheckOptionPrompt, AXError, AXIsProcessTrustedWithOptions, AXUIElement, AXValue,
     AXValueType,
 };
-use objc2_core_foundation::{CFBoolean, CFDictionary, CFRange, CFType, CGRect};
+use objc2_core_foundation::{CFBoolean, CFDictionary, CFRange, CFType, CGPoint, CGRect, CGSize};
 use objc2_foundation::NSString;
 use std::ptr::NonNull;
 use tauri::{PhysicalPosition, PhysicalRect, PhysicalSize};
@@ -67,13 +67,15 @@ pub fn get_caret() -> anyhow::Result<PhysicalRect<i32, u32>> {
     let selected_range = std::ptr::null() as *const CFRange;
     let selected_range_ptr = unsafe { std::mem::transmute(&selected_range) };
 
-    unsafe {
+    if !unsafe {
         AXValue::value(
             (selected_range_value as *const AXValue).as_ref().unwrap(),
             AXValueType::CFRange,
             NonNull::new(selected_range_ptr).unwrap(),
         )
-    };
+    } {
+        log::warn!("Getting selected range value returned false");
+    }
 
     let mut select_bounds = std::ptr::null();
     let ax_error = unsafe {
@@ -92,16 +94,18 @@ pub fn get_caret() -> anyhow::Result<PhysicalRect<i32, u32>> {
         ));
     }
 
-    let select_rect = CGRect::default();
+    let select_rect = CGRect::new(CGPoint::new(10., 10.), CGSize::default());
     let select_rect_ptr = unsafe { std::mem::transmute(&select_rect) };
 
-    unsafe {
+    if !unsafe {
         AXValue::value(
             (select_bounds as *const AXValue).as_ref().unwrap(),
             AXValueType::CGRect,
             NonNull::new(select_rect_ptr).unwrap(),
         )
-    };
+    } {
+        log::warn!("Getting select bounds rect value returned false");
+    }
 
     return Ok(PhysicalRect {
         position: PhysicalPosition {
