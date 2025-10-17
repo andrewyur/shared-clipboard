@@ -3,7 +3,7 @@ use objc2_application_services::{
     kAXTrustedCheckOptionPrompt, AXError, AXIsProcessTrustedWithOptions, AXUIElement, AXValue,
     AXValueType,
 };
-use objc2_core_foundation::{CFBoolean, CFDictionary, CFRange, CFType, CGPoint, CGRect, CGSize};
+use objc2_core_foundation::{CFBoolean, CFDictionary, CFRange, CFType, CGRect};
 use objc2_foundation::NSString;
 use std::ptr::NonNull;
 use tauri::{PhysicalPosition, PhysicalRect, PhysicalSize};
@@ -94,7 +94,7 @@ pub fn get_caret() -> anyhow::Result<PhysicalRect<i32, u32>> {
         ));
     }
 
-    let select_rect = CGRect::new(CGPoint::new(10., 10.), CGSize::default());
+    let select_rect = CGRect::default();
     let select_rect_ptr = unsafe { std::mem::transmute(&select_rect) };
 
     if !unsafe {
