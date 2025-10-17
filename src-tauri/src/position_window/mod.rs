@@ -15,7 +15,10 @@ pub fn position_window(window: &WebviewWindow) {
     if let Err(e) = try_position_window(window) {
         log::warn!("Was not able to position window at caret: {:#}", e);
 
-        if let Ok(cursor_position) = get_cursor_position(window) {
+        let cursor_position_res = get_cursor_position(window);
+        log::debug!("cursor position: {:?}", cursor_position_res);
+        if let Ok(cursor_position) = cursor_position_res  {
+            log::debug!("Cursor position: {:?}", cursor_position);
             _ = window.set_position(cursor_position);
         }
     }
@@ -41,6 +44,9 @@ fn try_position_window(window: &WebviewWindow) -> anyhow::Result<()> {
     }
 
     let window_position = calculate_window_position(caret, window)?;
+
+    log::debug!("Caret position: {:?}", window_position);
+
     window
         .set_position(window_position)
         .context("Could not set window position")?;
