@@ -6,11 +6,11 @@ use objc2_application_services::{
 use objc2_core_foundation::{CFBoolean, CFDictionary, CFIndex, CFRange, CFType, CGRect};
 use objc2_foundation::NSString;
 use std::{ffi::c_void, ptr::NonNull};
-use tauri::{PhysicalPosition, PhysicalRect, PhysicalSize};
+use tauri::{LogicalPosition, LogicalSize, LogicalRect};
 
 // translated from https://github.com/p0deje/Maccy/blob/3358537421cdb29613c19c6fc6f2b0c17fc412f0/Maccy/Maccy.swift
 // this usually only works with apps developed with apple using native text inputs... but its better than nothing i guess
-pub fn get_caret() -> anyhow::Result<PhysicalRect<i32, u32>> {
+pub fn get_caret() -> anyhow::Result<LogicalRect<i32, u32>> {
     let options = CFDictionary::from_slices(
         &[unsafe { kAXTrustedCheckOptionPrompt }],
         &[CFBoolean::new(true)],
@@ -113,14 +113,25 @@ pub fn get_caret() -> anyhow::Result<PhysicalRect<i32, u32>> {
         log::warn!("Getting select bounds rect value returned false");
     }
 
-    return Ok(PhysicalRect {
-        position: PhysicalPosition {
+    
+    return Ok(LogicalRect {
+        position: LogicalPosition {
             x: select_rect.origin.x as i32,
-            y: (select_rect.origin.y + select_rect.size.height) as i32,
+            y: (select_rect.origin.y + 2. * select_rect.size.height) as i32,
         },
-        size: PhysicalSize {
+        size: LogicalSize {
             width: select_rect.size.width as u32,
             height: select_rect.size.height as u32,
         },
     });
 }
+
+// if you ever want to fall back to fixed position within display of focused element, this is how you do it
+
+// let mut caret_display_id = CGDirectDisplayID::default();
+// let mut matched_displays = 0;
+
+// let cg_error = unsafe { CGGetDisplaysWithPoint(select_rect.origin, 1, &mut caret_display_id, &mut matched_displays) }; 
+// if cg_error != CGError::Success {
+//     return Err(anyhow!( "Could get display id for caret position: {:?}", cg_error ));
+// }

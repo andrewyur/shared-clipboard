@@ -75,15 +75,15 @@ pub fn show(app: &AppHandle) {
     _ = hook_manager.lock().as_mut().map(|h| h.install());
     _ = window.show();
 
-    #[cfg(target_os = "macos")]
-    {
-        use objc2_app_kit::NSWindow;
-        let ns_window_ptr = window.ns_window().unwrap();
-        unsafe {
-            let ns_window = &mut *(ns_window_ptr as *mut NSWindow);
-            ns_window.orderFrontRegardless();
-        }
-    }
+    // #[cfg(target_os = "macos")]
+    // {
+    //     use objc2_app_kit::NSWindow;
+    //     let ns_window_ptr = window.ns_window().unwrap();
+    //     unsafe {
+    //         let ns_window = &mut *(ns_window_ptr as *mut NSWindow);
+    //         ns_window.orderFront(None);
+    //     }
+    // }
 }
 
 #[tauri::command]

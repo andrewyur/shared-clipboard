@@ -50,7 +50,7 @@ fn setup(app: &mut App) -> Result<(), Box<dyn Error>> {
         window.set_visible_on_all_workspaces(true)?;
 
         use objc2_app_kit::{
-            NSWindow, NSWindowButton, NSWindowCollectionBehavior, NSWindowStyleMask,
+            NSWindow, NSWindowButton, NSWindowCollectionBehavior, NSWindowStyleMask, NSFloatingWindowLevel
         };
 
         let ns_window_ptr = window.ns_window().unwrap();
@@ -77,6 +77,8 @@ fn setup(app: &mut App) -> Result<(), Box<dyn Error>> {
             ns_window
                 .standardWindowButton(NSWindowButton::ZoomButton)
                 .map(|b| b.setHidden(true));
+
+            ns_window.setLevel(NSFloatingWindowLevel);
         }
 
         app.handle()
