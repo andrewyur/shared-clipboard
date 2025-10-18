@@ -1,5 +1,5 @@
 use anyhow::{anyhow, Context};
-use tauri::{Manager, PhysicalPosition, PhysicalRect, PhysicalSize, WebviewWindow};
+use tauri::{Manager, PhysicalPosition, PhysicalSize, WebviewWindow};
 
 #[cfg(target_os = "windows")]
 mod windows;
@@ -12,63 +12,46 @@ mod macos;
 use crate::position_window::macos::get_caret;
 
 pub fn position_window(window: &WebviewWindow) {
-    if let Err(e) = try_position_window(window) {
+    if let Err(e) = move_to_caret(window) {
         log::warn!("Was not able to position window at caret: {:#}", e);
 
-        let cursor_position_res = get_cursor_position(window);
-        log::debug!("cursor position: {:?}", cursor_position_res);
-        if let Ok(cursor_position) = cursor_position_res  {
-            log::debug!("Cursor position: {:?}", cursor_position);
-            _ = window.set_position(cursor_position);
+        if let Err(e) = move_to_cursor(window) {
+            log::warn!("Was not able to position window at cursor: {:#}", e);
         }
     }
 }
 
-fn get_cursor_position(window: &WebviewWindow) -> anyhow::Result<PhysicalPosition<i32>> {
+fn move_to_cursor(window: &WebviewWindow) -> anyhow::Result<()> {
     let cursor_position = window.app_handle().cursor_position()?;
     let monitor = get_monitor_for_point(window, cursor_position.cast())?;
     let window_size = window.outer_size().unwrap();
 
-    clamp_position_to_monitor(
+    let window_position = clamp_position_to_monitor(
         cursor_position.x as i32,
         cursor_position.y as i32,
         window_size,
         &monitor,
-    )
+    )?;
+
+    move_window(window, window_position)
 }
 
-fn try_position_window(window: &WebviewWindow) -> anyhow::Result<()> {
+fn move_to_caret(window: &WebviewWindow) -> anyhow::Result<()> {
     let caret = get_caret().context("Could not get caret position")?;
     if caret.position.x == 0 && caret.position.y == 0 {
         return Err(anyhow!("Caret is not visible"));
     }
-
-    let window_position = calculate_window_position(caret, window)?;
-
-    log::debug!("Caret position: {:?}", window_position);
-
-    window
-        .set_position(window_position)
-        .context("Could not set window position")?;
-
-    Ok(())
-}
-
-fn calculate_window_position(
-    caret: PhysicalRect<i32, u32>,
-    window: &WebviewWindow,
-) -> anyhow::Result<PhysicalPosition<i32>> {
     let monitor = get_monitor_for_point(window, caret.position)?;
     let window_size = window.outer_size().unwrap();
 
-    let x = caret.position.x;
-    let mut y = caret.position.y + caret.size.height as i32;
+    let window_position = clamp_position_to_monitor(
+        caret.position.x,
+        caret.position.y + caret.size.height as i32,
+        window_size,
+        &monitor,
+    )?;
 
-    if y + window_size.height as i32 > monitor.size().height as i32 {
-        y = caret.position.y - window_size.height as i32;
-    }
-
-    clamp_position_to_monitor(x, y, window_size, &monitor)
+    move_window(window, window_position)
 }
 
 fn get_monitor_for_point(
@@ -82,21 +65,30 @@ fn get_monitor_for_point(
 }
 
 fn clamp_position_to_monitor(
-    mut x: i32,
-    mut y: i32,
+    x: i32,
+    y: i32,
     window_size: PhysicalSize<u32>,
     monitor: &tauri::Monitor,
 ) -> anyhow::Result<PhysicalPosition<i32>> {
-    let monitor_size = monitor.size();
-    if x + window_size.width as i32 > monitor_size.width as i32 {
-        x = monitor_size.width as i32 - window_size.width as i32;
-    }
-    if y + window_size.height as i32 > monitor_size.height as i32 {
-        y = monitor_size.height as i32 - window_size.height as i32;
-    }
+    let monitor_position = monitor.position().to_logical::<i32>(monitor.scale_factor());
+    let monitor_size = monitor.size().to_logical::<i32>(monitor.scale_factor());
+    let window_size = window_size.to_logical::<i32>(monitor.scale_factor());
 
-    Ok(PhysicalPosition {
-        x: x.max(0),
-        y: y.max(0),
+    Ok(PhysicalPosition { 
+        x: x.clamp(monitor_position.x, monitor_position.x + monitor_size.width as i32 - window_size.width as i32), 
+        y: y.clamp(monitor_position.y, monitor_position.y + monitor_size.height as i32 - window_size.height as i32),
     })
+}
+
+fn move_window(window: &WebviewWindow, position: PhysicalPosition<i32>) -> anyhow::Result<()> {
+    let main_monitor = window
+        .primary_monitor()
+        .context("could not get the primary monitor")?
+        .ok_or_else(|| anyhow!("No primary monitor"))?;
+
+    let logical = position.to_logical::<i32>(main_monitor.scale_factor());
+
+    window
+        .set_position(logical)
+        .context("Could not set window position")
 }
