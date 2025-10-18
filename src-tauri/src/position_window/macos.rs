@@ -3,9 +3,9 @@ use objc2_application_services::{
     kAXTrustedCheckOptionPrompt, AXError, AXIsProcessTrustedWithOptions, AXUIElement, AXValue,
     AXValueType,
 };
-use objc2_core_foundation::{CFBoolean, CFDictionary, CFRange, CFType, CGRect};
+use objc2_core_foundation::{CFBoolean, CFDictionary, CFIndex, CFRange, CFType, CGRect};
 use objc2_foundation::NSString;
-use std::ptr::NonNull;
+use std::{ffi::c_void, ptr::NonNull};
 use tauri::{PhysicalPosition, PhysicalRect, PhysicalSize};
 
 // translated from https://github.com/p0deje/Maccy/blob/3358537421cdb29613c19c6fc6f2b0c17fc412f0/Maccy/Maccy.swift
@@ -17,7 +17,7 @@ pub fn get_caret() -> anyhow::Result<PhysicalRect<i32, u32>> {
     );
 
     if !unsafe { AXIsProcessTrustedWithOptions(Some(options.as_opaque())) } {
-        return Ok(PhysicalRect::default());
+        return Err(anyhow!("Process is not trusted"))
     }
 
     let systemwide_element = unsafe { AXUIElement::new_system_wide() };
@@ -43,6 +43,10 @@ pub fn get_caret() -> anyhow::Result<PhysicalRect<i32, u32>> {
         }
     }
 
+    if focused_element.is_null() {
+        return Err(anyhow!("focused_element is null"))
+    }
+
     let mut selected_range_value: *const CFType = std::ptr::null();
 
     let ax_error = unsafe {
@@ -64,14 +68,17 @@ pub fn get_caret() -> anyhow::Result<PhysicalRect<i32, u32>> {
         }
     }
 
-    let selected_range = std::ptr::null() as *const CFRange;
-    let selected_range_ptr = unsafe { std::mem::transmute(&selected_range) };
+    if selected_range_value.is_null() {
+        return Err(anyhow!("selected_range_value is null"))
+    }
+
+    let mut selected_range = CFRange::new(CFIndex::default(), CFIndex::default());
 
     if !unsafe {
         AXValue::value(
             (selected_range_value as *const AXValue).as_ref().unwrap(),
             AXValueType::CFRange,
-            NonNull::new(selected_range_ptr).unwrap(),
+            NonNull::new(&mut selected_range as *mut _ as *mut c_void).unwrap(),
         )
     } {
         log::warn!("Getting selected range value returned false");
@@ -94,14 +101,13 @@ pub fn get_caret() -> anyhow::Result<PhysicalRect<i32, u32>> {
         ));
     }
 
-    let select_rect = CGRect::default();
-    let select_rect_ptr = unsafe { std::mem::transmute(&select_rect) };
+    let mut select_rect = CGRect::default();
 
     if !unsafe {
         AXValue::value(
             (select_bounds as *const AXValue).as_ref().unwrap(),
             AXValueType::CGRect,
-            NonNull::new(select_rect_ptr).unwrap(),
+            NonNull::new(&mut select_rect as *mut _ as *mut c_void).unwrap(),
         )
     } {
         log::warn!("Getting select bounds rect value returned false");
