@@ -6,7 +6,7 @@ use objc2_application_services::{
 use objc2_core_foundation::{CFBoolean, CFDictionary, CFIndex, CFRange, CFType, CGRect};
 use objc2_foundation::NSString;
 use std::{ffi::c_void, ptr::NonNull};
-use tauri::{LogicalPosition, LogicalRect, LogicalSize};
+use tauri::{LogicalPosition, LogicalRect, LogicalSize, WebviewWindow};
 
 // translated from https://github.com/p0deje/Maccy/blob/3358537421cdb29613c19c6fc6f2b0c17fc412f0/Maccy/Maccy.swift
 // this usually only works with apps developed with apple using native text inputs... but its better than nothing i guess
