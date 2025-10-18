@@ -1,6 +1,6 @@
 [package]
 name = "shared-clipboard"
-version = "0.1.7"
+version = "0.1.8"
 description = "Clipboard Manager that can share across local networks"
 authors = ["Andrew Yurovchak"]
 edition = "2021"
@@ -14,10 +14,10 @@ edition = "2021"
 name = "purple_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
-[profile.release]
-opt-level = 2
-lto = false
-incremental = true
+# [profile.release]
+# opt-level = 2
+# lto = false
+# incremental = true
 
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
