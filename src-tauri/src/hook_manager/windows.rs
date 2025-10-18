@@ -160,7 +160,9 @@ unsafe extern "system" fn keyboard_hook_proc(code: i32, wparam: WPARAM, lparam: 
         let kb = *(lparam.0 as *const KBDLLHOOKSTRUCT);
 
         if wparam.0 as u32 == WM_KEYDOWN {
-            let key = match VIRTUAL_KEY(kb.vkCode as _) {
+            let v_key = VIRTUAL_KEY(kb.vkCode as _);
+
+            let key = match v_key {
                 VK_RETURN => TargetKeys::Enter,
                 VK_LEFT => TargetKeys::LeftArrow,
                 VK_RIGHT => TargetKeys::RightArrow,
@@ -171,8 +173,10 @@ unsafe extern "system" fn keyboard_hook_proc(code: i32, wparam: WPARAM, lparam: 
             let intercept = key != TargetKeys::Other;
 
             let tx = SENDER.get().unwrap();
-            tx.send(HookEvent::Keyboard(key))
-                .expect("Could not send key to listener thread");
+            if v_key == VK_CONTROL ||  v_key == VK_MENU {
+                tx.send(HookEvent::Keyboard(key))
+                    .expect("Could not send key to listener thread");
+            }
             if intercept {
                 return LRESULT(1);
             }

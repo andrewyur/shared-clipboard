@@ -6,18 +6,18 @@ use objc2_application_services::{
 use objc2_core_foundation::{CFBoolean, CFDictionary, CFIndex, CFRange, CFType, CGRect};
 use objc2_foundation::NSString;
 use std::{ffi::c_void, ptr::NonNull};
-use tauri::{LogicalPosition, LogicalSize, LogicalRect};
+use tauri::{LogicalPosition, LogicalRect, LogicalSize};
 
 // translated from https://github.com/p0deje/Maccy/blob/3358537421cdb29613c19c6fc6f2b0c17fc412f0/Maccy/Maccy.swift
 // this usually only works with apps developed with apple using native text inputs... but its better than nothing i guess
-pub fn get_caret() -> anyhow::Result<LogicalRect<i32, u32>> {
+pub fn get_caret(_window: &WebviewWindow) -> anyhow::Result<LogicalRect<i32, u32>> {
     let options = CFDictionary::from_slices(
         &[unsafe { kAXTrustedCheckOptionPrompt }],
         &[CFBoolean::new(true)],
     );
 
     if !unsafe { AXIsProcessTrustedWithOptions(Some(options.as_opaque())) } {
-        return Err(anyhow!("Process is not trusted"))
+        return Err(anyhow!("Process is not trusted"));
     }
 
     let systemwide_element = unsafe { AXUIElement::new_system_wide() };
@@ -44,7 +44,7 @@ pub fn get_caret() -> anyhow::Result<LogicalRect<i32, u32>> {
     }
 
     if focused_element.is_null() {
-        return Err(anyhow!("focused_element is null"))
+        return Err(anyhow!("focused_element is null"));
     }
 
     let mut selected_range_value: *const CFType = std::ptr::null();
@@ -69,7 +69,7 @@ pub fn get_caret() -> anyhow::Result<LogicalRect<i32, u32>> {
     }
 
     if selected_range_value.is_null() {
-        return Err(anyhow!("selected_range_value is null"))
+        return Err(anyhow!("selected_range_value is null"));
     }
 
     let mut selected_range = CFRange::new(CFIndex::default(), CFIndex::default());
@@ -113,11 +113,10 @@ pub fn get_caret() -> anyhow::Result<LogicalRect<i32, u32>> {
         log::warn!("Getting select bounds rect value returned false");
     }
 
-    
     return Ok(LogicalRect {
         position: LogicalPosition {
             x: select_rect.origin.x as i32,
-            y: (select_rect.origin.y + 2. * select_rect.size.height) as i32,
+            y: (select_rect.origin.y + select_rect.size.height) as i32,
         },
         size: LogicalSize {
             width: select_rect.size.width as u32,
@@ -131,7 +130,7 @@ pub fn get_caret() -> anyhow::Result<LogicalRect<i32, u32>> {
 // let mut caret_display_id = CGDirectDisplayID::default();
 // let mut matched_displays = 0;
 
-// let cg_error = unsafe { CGGetDisplaysWithPoint(select_rect.origin, 1, &mut caret_display_id, &mut matched_displays) }; 
+// let cg_error = unsafe { CGGetDisplaysWithPoint(select_rect.origin, 1, &mut caret_display_id, &mut matched_displays) };
 // if cg_error != CGError::Success {
 //     return Err(anyhow!( "Could get display id for caret position: {:?}", cg_error ));
 // }

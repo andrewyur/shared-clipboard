@@ -1,11 +1,11 @@
 use anyhow::{anyhow, Context};
-use tauri::{PhysicalPosition, PhysicalRect, PhysicalSize};
+use tauri::{LogicalRect, PhysicalPosition, PhysicalSize, WebviewWindow};
 use windows::core::Interface;
 use windows::Win32::UI::Accessibility::{AccessibleObjectFromWindow, IAccessible};
 use windows::Win32::UI::WindowsAndMessaging::*;
 
 // caret as a physical rect, position as 0,0 if not available.
-pub fn get_caret() -> anyhow::Result<PhysicalRect<i32, u32>> {
+pub fn get_caret(window: &WebviewWindow) -> anyhow::Result<LogicalRect<i32, u32>> {
     unsafe {
         let hwind = GetForegroundWindow();
         if hwind.0.is_null() {
@@ -55,12 +55,14 @@ pub fn get_caret() -> anyhow::Result<PhysicalRect<i32, u32>> {
         )
         .with_context(|| "Unable to get location from accessibility element")?;
 
-        Ok(PhysicalRect {
-            position: PhysicalPosition { x: left, y: top },
-            size: PhysicalSize {
-                width: width as u32,
-                height: height as u32,
-            },
+        let monitor = window.monitor_from_point(left as f64, top as f64)?.ok_or_else(|| anyhow!("Could not get monitor from caret location"))?;
+
+        let p_position = PhysicalPosition  { x: left, y: top };
+        let p_size = PhysicalSize { width: width as u32, height: height as u32 };
+
+        Ok(LogicalRect {
+            position: p_position.to_logical(monitor.scale_factor()),
+            size: p_size.to_logical(monitor.scale_factor())
         })
     }
 }

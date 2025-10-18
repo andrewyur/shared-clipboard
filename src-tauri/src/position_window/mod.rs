@@ -23,7 +23,7 @@ pub fn position_window(window: &WebviewWindow) {
 
 fn move_to_cursor(window: &WebviewWindow) -> anyhow::Result<()> {
     let physical_cursor = window.app_handle().cursor_position()?;
-    let main_monitor =     window
+    let main_monitor = window
         .primary_monitor()
         .context("Could not get primary monitor")?
         .ok_or_else(|| anyhow!("No primary monitor"))?;
@@ -35,7 +35,10 @@ fn move_to_cursor(window: &WebviewWindow) -> anyhow::Result<()> {
         .outer_size()
         .unwrap()
         .to_logical(cursor_monitor.scale_factor());
-    let window_position = clamp_position_to_monitor(logical_cursor, window_size, &cursor_monitor, 0);
+    let window_position =
+        clamp_position_to_monitor(logical_cursor, window_size, &cursor_monitor, 0);
+
+    log::debug!("positioning window at cursor: {:?}", window_position);
 
     window
         .set_position(window_position)
@@ -43,22 +46,29 @@ fn move_to_cursor(window: &WebviewWindow) -> anyhow::Result<()> {
 }
 
 fn move_to_caret(window: &WebviewWindow) -> anyhow::Result<()> {
-    let caret = get_caret().context("Could not get caret position")?;
+    let mut caret = get_caret(window).context("Could not get caret position")?;
     if caret.position.x == 0 && caret.position.y == 0 {
         return Err(anyhow!("Caret is not visible"));
     }
 
     let caret_monitor = get_monitor_for_point(window, caret.position)?;
-    let window_size = window.outer_size().unwrap().to_logical::<u32>(caret_monitor.scale_factor());
+    let window_size = window
+        .outer_size()
+        .unwrap()
+        .to_logical::<u32>(caret_monitor.scale_factor());
+
+    caret.position.y += caret.size.height as i32;
 
     let window_position = clamp_position_to_monitor(
         caret.position,
         window_size,
         &caret_monitor,
-        caret.size.height
+        caret.size.height,
     );
 
-        window
+    log::debug!("positioning window at caret: {:?}", window_position);
+
+    window
         .set_position(window_position)
         .context("Could not set window position")
 }
@@ -71,7 +81,6 @@ fn get_monitor_for_point(
         .monitor_from_point(point.x as f64, point.y as f64)
         .with_context(|| format!("Could not get monitor for point {:?}", point))?
         .ok_or_else(|| anyhow!("Could not get monitor for point {:?}", point))
-        .inspect(|m| log::debug!("got monitor: {}", m.name().unwrap()))
 }
 
 fn clamp_position_to_monitor(
@@ -85,7 +94,7 @@ fn clamp_position_to_monitor(
 
     let mut x = window_position.x;
     let mut y = window_position.y;
-    
+
     if x > monitor_position.x + monitor_size.width as i32 - window_size.width as i32 {
         x -= window_size.width as i32
     }

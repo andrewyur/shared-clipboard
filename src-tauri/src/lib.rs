@@ -50,7 +50,8 @@ fn setup(app: &mut App) -> Result<(), Box<dyn Error>> {
         window.set_visible_on_all_workspaces(true)?;
 
         use objc2_app_kit::{
-            NSWindow, NSWindowButton, NSWindowCollectionBehavior, NSWindowStyleMask, NSFloatingWindowLevel
+            NSFloatingWindowLevel, NSWindow, NSWindowButton, NSWindowCollectionBehavior,
+            NSWindowStyleMask,
         };
 
         let ns_window_ptr = window.ns_window().unwrap();
