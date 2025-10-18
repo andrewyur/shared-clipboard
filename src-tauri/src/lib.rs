@@ -95,9 +95,9 @@ fn setup(app: &mut App) -> Result<(), Box<dyn Error>> {
 
     let autostart_manager = app.autolaunch();
     if !cfg!(dev) {
-        let _ = autostart_manager
-            .enable()
-            .map_err(|e| log::warn!("Could not enable autostart: {:#}", e));
+        if !autostart_manager.is_enabled()? {
+            autostart_manager.enable()?;
+        }
 
         let handle = app.handle().clone();
         tauri::async_runtime::spawn(async move {
