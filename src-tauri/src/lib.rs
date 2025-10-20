@@ -39,6 +39,8 @@ async fn update(app: tauri::AppHandle) -> tauri_plugin_updater::Result<()> {
 }
 
 fn setup(app: &mut App) -> Result<(), Box<dyn Error>> {
+    log::info!("setting up app...");
+
     let window = app
         .get_webview_window("main")
         .expect("Could not get window handle during setup function");
@@ -51,7 +53,7 @@ fn setup(app: &mut App) -> Result<(), Box<dyn Error>> {
 
         use objc2_app_kit::{
             NSFloatingWindowLevel, NSWindow, NSWindowButton, NSWindowCollectionBehavior,
-            NSWindowStyleMask,
+            NSWindowStyleMask, NSWindowAnimationBehavior,
         };
 
         let ns_window_ptr = window.ns_window().unwrap();
@@ -80,6 +82,7 @@ fn setup(app: &mut App) -> Result<(), Box<dyn Error>> {
                 .map(|b| b.setHidden(true));
 
             ns_window.setLevel(NSFloatingWindowLevel);
+            ns_window.setAnimationBehavior(NSWindowAnimationBehavior::None);
         }
 
         app.handle()
@@ -97,6 +100,7 @@ fn setup(app: &mut App) -> Result<(), Box<dyn Error>> {
     if !cfg!(dev) {
         if !autostart_manager.is_enabled()? {
             autostart_manager.enable()?;
+            log::info!("enabled autostart")
         }
 
         let handle = app.handle().clone();
@@ -131,10 +135,6 @@ fn setup(app: &mut App) -> Result<(), Box<dyn Error>> {
                 if shortcut == &open_shortcut && event.state == ShortcutState::Pressed {
                     let window = app.get_webview_window("main").unwrap();
                     position_window::position_window(&window);
-                    // sleep to let window position call be registered before window shown, so they happen in order
-                    // i know this is bad, not sure how else to do it though, tokio fails for some reason
-                    #[cfg(target_os = "macos")]
-                    std::thread::sleep(std::time::Duration::from_millis(16));
                     show(&app);
                     app.emit("window-shown", {})
                         .expect("Could not emit clipboard-changed event");
