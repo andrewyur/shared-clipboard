@@ -5,7 +5,9 @@ use image::{imageops::thumbnail, ImageBuffer, ImageFormat, Rgba};
 use serde::ser::SerializeStruct;
 use serde_json::json;
 use std::fs;
-use std::sync::mpsc;
+use std::hash::Hash;
+use std::sync::atomic::{AtomicU32, Ordering};
+use std::sync::{mpsc, Arc};
 use std::{io::Cursor, path::PathBuf};
 use tauri::Manager;
 use tauri::{image::Image, AppHandle};
@@ -14,18 +16,22 @@ use tauri_plugin_store::StoreExt;
 
 const THUMBNAIL_HEIGHT: u32 = 300;
 const PINNED_STORE: &str = "pinned.json";
+static NEXT_ID: AtomicU32 = AtomicU32::new(0);
 
 #[derive(Debug, Clone)]
 pub enum Contents {
     FilePath {
         paths: Vec<PathBuf>,
+        id: u32,
     },
     Image {
         thumbnail: String,
         image: Image<'static>,
+        id: u32,
     },
     Text {
         text: String,
+        id: u32
     },
 }
 
@@ -59,7 +65,7 @@ impl Contents {
     fn _try_from_clipboard(app: &AppHandle) -> Option<Self> {
         log::info!("Clipboard handler checking clipboard");
         match clipboard_files::read() {
-            Ok(paths) => return Some(Self::FilePath { paths }),
+            Ok(paths) => return Some(Self::FilePath { paths, id: NEXT_ID.fetch_add(1, Ordering::Relaxed) }),
             Err(clipboard_files::ClipboardError::NoFiles) => {}
             Err(e) => {
                 log::error!(
@@ -75,6 +81,7 @@ impl Contents {
                     return Some(Self::Image {
                         thumbnail,
                         image: image.to_owned(),
+                        id: NEXT_ID.fetch_add(1, Ordering::Relaxed) 
                     });
                 }
             }
@@ -85,7 +92,7 @@ impl Contents {
         }
 
         match app.clipboard().read_text() {
-            Ok(text) => return Some(Self::Text { text }),
+            Ok(text) => return Some(Self::Text { text, id: NEXT_ID.fetch_add(1, Ordering::Relaxed) }),
             Err(e) => {
                 log::warn!("Possible error pasting text from clipboard: {e}");
             }
@@ -109,6 +116,14 @@ impl Contents {
             },
         }
     }
+
+    pub fn id(&self) -> u32 {
+        match self {
+            Contents::FilePath { id, .. } => *id,
+            Contents::Image { id, .. } => *id,
+            Contents::Text { id , ..} => *id
+        }
+    }
 }
 
 impl serde::Serialize for Contents {
@@ -118,20 +133,46 @@ impl serde::Serialize for Contents {
     {
         let mut s = serializer.serialize_struct("ClipItem", 2)?;
         match self {
-            Self::Image { thumbnail, .. } => {
+            Self::Image { thumbnail, id, .. } => {
                 s.serialize_field("content", thumbnail)?;
                 s.serialize_field("kind", "image")?;
+                s.serialize_field("id", id)?;
             }
-            Self::FilePath { paths, .. } => {
+            Self::FilePath { paths, id } => {
                 s.serialize_field("content", paths)?;
                 s.serialize_field("kind", "paths")?;
+                s.serialize_field("id", id)?;
             }
-            Self::Text { text, .. } => {
+            Self::Text { text, id } => {
                 s.serialize_field("content", text)?;
                 s.serialize_field("kind", "text")?;
+                s.serialize_field("id", id)?;
             }
         };
         s.end()
+    }
+}
+
+impl PartialEq for Contents {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Contents::FilePath { paths: p1, .. }, Contents::FilePath { paths: p2, .. }) => p1 == p2,
+            (Contents::Image { thumbnail: t1, .. }, Contents::Image { thumbnail: t2, .. }) => t1 == t2,
+            (Contents::Text { text: t1, .. }, Contents::Text { text: t2, .. }) => t1 == t2,
+            _ => false
+        }
+    }
+}
+
+impl Eq for Contents {}
+
+impl Hash for Contents {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        match self {
+            Contents::FilePath { paths , ..} => paths.hash(state),
+            Contents::Image { thumbnail, .. } => thumbnail.hash(state),
+            Contents::Text { text , ..} => text.hash(state),
+        }
     }
 }
 
@@ -161,7 +202,7 @@ fn create_base64_thumbnail(image: &Image) -> Result<String, anyhow::Error> {
     ))
 }
 
-pub fn store_pinned(contents: &Vec<&Contents>, app: &AppHandle) -> Result<(), anyhow::Error> {
+pub fn store_pinned(contents: &[Arc<Contents>], app: &AppHandle) -> Result<(), anyhow::Error> {
     let store = app
         .store(PINNED_STORE)
         .with_context(|| "failed to get pinned items store")?;
@@ -195,9 +236,9 @@ pub fn store_pinned(contents: &Vec<&Contents>, app: &AppHandle) -> Result<(), an
 
     let serialized = contents
         .iter()
-        .map(|c| match c {
-            Contents::FilePath { paths } => Ok(json!({"type": "paths", "content": paths})),
-            Contents::Text { text } => Ok(json!({"type": "text", "content": text})),
+        .map(|c| match c.as_ref() {
+            Contents::FilePath { paths , ..} => Ok(json!({"type": "paths", "content": paths})),
+            Contents::Text { text, ..} => Ok(json!({"type": "text", "content": text})),
             Contents::Image { image, .. } => {
                 image_file_name += 1;
                 let mut image_path = images_directory.clone();
@@ -209,7 +250,7 @@ pub fn store_pinned(contents: &Vec<&Contents>, app: &AppHandle) -> Result<(), an
                 Ok(json!({ "type": "image", "content": {
                     "file": image_file_name.to_string(),
                     "height": image.height(),
-                    "width": image.width()
+                    "width": image.width(),
                 }}))
             }
         })
@@ -247,12 +288,12 @@ pub fn load_pinned(app: &AppHandle) -> Result<Vec<Contents>, anyhow::Error> {
                 match type_str {
                     "text" => {
                         let text = content_obj.as_str().ok_or_else(|| anyhow!("Value for 'content' was not a string for 'text' item"))?.to_string();
-                        Ok(Contents::Text { text })
+                        Ok(Contents::Text { text, id: NEXT_ID.fetch_add(1, Ordering::Relaxed)  })
                     },
                     "paths" => {
                         let path_arr = content_obj.as_array().ok_or_else(|| anyhow!("Value for 'content' was not an array for 'paths' item"))?;
                         let paths = path_arr.iter().map(|p|p.as_str().map(PathBuf::from)).collect::<Option<Vec<_>>>().ok_or_else(|| anyhow!("Not all items in paths array were strings"))?;
-                        Ok(Contents::FilePath { paths })
+                        Ok(Contents::FilePath { paths, id: NEXT_ID.fetch_add(1, Ordering::Relaxed)  })
                     },
                     "image" => {
                         let image_data_obj = content_obj.as_object().ok_or_else(|| anyhow!("Value for 'content' was not an object for 'image' item"))?;
@@ -271,7 +312,7 @@ pub fn load_pinned(app: &AppHandle) -> Result<Vec<Contents>, anyhow::Error> {
                         let rgba = fs::read(&image_path).with_context(|| format!("Failed to read image data from {}", image_path.display()))?;
                         let image = Image::new_owned(rgba, width as u32, height as u32);
                         let thumbnail = create_base64_thumbnail(&image)?;
-                        Ok(Contents::Image { thumbnail, image })
+                        Ok(Contents::Image { thumbnail, image, id: NEXT_ID.fetch_add(1, Ordering::Relaxed)  })
                     },
                     _ => Err(anyhow!("type for pinned object not 'image', 'paths', or 'text'"))
                 }

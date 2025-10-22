@@ -69,14 +69,14 @@
         onfocusout={handleFocusOut}
         class:focused={focused}
     >
-        {#if itemData.contents.kind === "text"}
-            <p>{itemData.contents.content}</p>
-        {:else if itemData.contents.kind === "paths"}
+        {#if itemData.kind === "text"}
+            <p>{itemData.content}</p>
+        {:else if itemData.kind === "paths"}
             <p style="font-style:italic; color:gray">
-                {itemData.contents.content.join("\n")}
+                {itemData.content.join("\n")}
             </p>
         {:else}
-            <img src={itemData.contents.content} alt="clipboard item" />
+            <img src={itemData.content} alt="clipboard item" />
         {/if}
     </button>
     

@@ -6,8 +6,6 @@ Support for sharing clipboard contents accross local networks (eventually)
 
 ## Roadmap
 
-- Fix macos bugs
-- hash clipboard contents to tell if they are duplicates
 - Fix windows bugs
 - zeroconf & clipboard sharing
 - X11 and Wayland support
