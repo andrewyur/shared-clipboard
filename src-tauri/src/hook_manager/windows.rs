@@ -173,7 +173,7 @@ unsafe extern "system" fn keyboard_hook_proc(code: i32, wparam: WPARAM, lparam: 
             let intercept = key != TargetKeys::Other;
 
             let tx = SENDER.get().unwrap();
-            if v_key == VK_CONTROL ||  v_key == VK_MENU {
+            if v_key != VK_CONTROL && v_key != VK_RCONTROL && v_key != VK_LCONTROL && v_key != VK_MENU {
                 tx.send(HookEvent::Keyboard(key))
                     .expect("Could not send key to listener thread");
             }
